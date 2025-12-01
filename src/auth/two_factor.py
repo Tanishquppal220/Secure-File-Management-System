@@ -3,7 +3,8 @@ Two-Factor Authentication (2FA) implementation using TOTP
 """
 import pyotp
 import qrcode
-from io import BytesIO
+from io import BytesIO  
+from typing import Optional
 
 
 class TwoFactorAuth:

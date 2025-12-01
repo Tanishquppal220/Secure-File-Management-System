@@ -4,7 +4,7 @@ File encryption and decryption utilities using Fernet (AES)
 import os
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf. pbkdf2 import PBKDF2
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.backends import default_backend
 import base64
 from typing import Tuple
@@ -24,7 +24,7 @@ class FileEncryption:
     @staticmethod
     def derive_key_from_password(password: str, salt: bytes = None) -> Tuple[bytes, bytes]:
         """
-        Derive encryption key from password using PBKDF2
+        Derive encryption key from password using PBKDF2HMAC
         Args:
             password: Password to derive key from
             salt: Salt for key derivation (generated if None)
@@ -34,7 +34,7 @@ class FileEncryption:
         if salt is None:
             salt = os.urandom(16)
 
-        kdf = PBKDF2(
+        kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
             length=32,
             salt=salt,

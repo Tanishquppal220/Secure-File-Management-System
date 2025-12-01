@@ -9,7 +9,8 @@ from src.auth.password_manager import PasswordManager
 from src. auth.two_factor import TwoFactorAuth
 from src.utils.validators import Validators
 from src.utils.logger import logger
-
+from io import BytesIO  
+from typing import Optional
 
 class AuthManager:
     """Manage user authentication and authorization"""
