@@ -18,7 +18,7 @@ class VirusTotalScanner:
 
     def __init__(self):
         self.api_key = os.getenv('VIRUSTOTAL_API_KEY')
-        self.base_url = "https://www. virustotal.com/api/v3"
+        self.base_url = "https://www.virustotal.com/api/v3"
         self.headers = {
             "x-apikey": self.api_key
         }
