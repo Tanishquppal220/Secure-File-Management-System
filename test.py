@@ -99,3 +99,75 @@ if tests_failed == 0:
 else:
     print(f"\n⚠️ {tests_failed} test(s) failed.")
     print("Please add the missing code to the files above.")
+
+
+# test_part2.py
+"""
+Test Part 2: Threat Detection & File Operations
+"""
+
+print("🔍 Testing Part 2 Setup")
+print("=" * 60)
+
+tests_passed = 0
+tests_failed = 0
+
+# Test 1: Import threat detection
+try:
+    from src.threat_detection. malware_scanner import MalwareScanner
+    from src.threat_detection.virustotal_scanner import VirusTotalScanner
+    print("✅ Threat detection module imports successful")
+    tests_passed += 1
+except Exception as e:
+    print(f"❌ Threat detection import failed: {e}")
+    tests_failed += 1
+
+# Test 2: Import file operations
+try:
+    from src.file_ops. file_manager import FileManager
+    print("✅ File operations module imports successful")
+    tests_passed += 1
+except Exception as e:
+    print(f"❌ File operations import failed: {e}")
+    tests_failed += 1
+
+# Test 3: Initialize MalwareScanner
+try:
+    scanner = MalwareScanner()
+    print("✅ MalwareScanner initialized")
+    tests_passed += 1
+except Exception as e:
+    print(f"❌ MalwareScanner initialization failed: {e}")
+    tests_failed += 1
+
+# Test 4: Initialize FileManager
+try:
+    file_manager = FileManager()
+    print("✅ FileManager initialized")
+    tests_passed += 1
+except Exception as e:
+    print(f"❌ FileManager initialization failed: {e}")
+    tests_failed += 1
+
+# Test 5: Check directories created
+try:
+    from pathlib import Path
+    assert Path("uploads").exists()
+    assert Path("encrypted_files").exists()
+    print("✅ File directories created")
+    tests_passed += 1
+except Exception as e:
+    print(f"❌ Directory check failed: {e}")
+    tests_failed += 1
+
+print("\n" + "=" * 60)
+print(f"Tests Passed: {tests_passed}")
+print(f"Tests Failed: {tests_failed}")
+print("=" * 60)
+
+if tests_failed == 0:
+    print("\n🎉 PART 2 SETUP COMPLETE!")
+    print("Ready to move to Part 3: Streamlit UI!")
+else:
+    print(f"\n⚠️ {tests_failed} test(s) failed.")
+    print("Please check the errors above.")
