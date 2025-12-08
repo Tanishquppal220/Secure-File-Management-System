@@ -76,7 +76,7 @@ def upload_page():
 
         if success:
             st.success(f"✅ {message}")
-            st.balloons()
+            # st.balloons()
 
             # Show file ID
             with st.expander("📋 File Details"):
