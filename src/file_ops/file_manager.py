@@ -14,6 +14,7 @@ from src.utils.validators import Validators
 from src.utils.logger import logger
 from src.threat_detection.malware_scanner import MalwareScanner
 import mimetypes
+import streamlit as st
 
 
 class FileManager:
@@ -35,11 +36,10 @@ class FileManager:
 
         # File size limit (from env or default 50MB)
         self.max_file_size = int(
-            os.getenv('MAX_FILE_SIZE_MB', 50)) * 1024 * 1024
+            st.secrets['app']['MAX_FILE_SIZE_MB']) * 1024 * 1024
 
         # Allowed file types
-        allowed_types = os.getenv(
-            'ALLOWED_FILE_TYPES', 'pdf,txt,docx,xlsx,jpg,png,zip')
+        allowed_types = st.secrets['app']['ALLOWED_FILE_TYPES']
         self.allowed_extensions = [ext.strip()
                                    for ext in allowed_types.split(',')]
 

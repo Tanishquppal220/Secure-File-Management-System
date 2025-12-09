@@ -4,10 +4,7 @@ MongoDB connection handler
 import os
 from pymongo import MongoClient
 from pymongo.errors import ConnectionFailure
-import toml
-
-config = toml.load("config.toml")
-value = config["mongodb"]["uri"]
+import streamlit as st
 
 
 class DatabaseConnection:
@@ -29,7 +26,7 @@ class DatabaseConnection:
     def connect(self):
         """Establish MongoDB connection"""
         try:
-            mongodb_uri = os.getenv('MONGODB_URI')
+            mongodb_uri = st.secrets["mongodb"]["MONGODB_URI"]
             if not mongodb_uri:
                 raise ValueError(
                     "MongoDB URI not found in environment variables")
@@ -39,7 +36,7 @@ class DatabaseConnection:
             # Test connection
             self._client.admin.command('ping')
 
-            db_name = os.getenv('DATABASE_NAME', 'secure_file_mgmt')
+            db_name = st.secrets['mongodb']['DATABASE_NAME']
             self._db = self._client[db_name]
 
             # Create indexes

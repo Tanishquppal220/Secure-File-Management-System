@@ -7,10 +7,7 @@ import hashlib
 from typing import Dict, Tuple, Optional
 from pathlib import Path
 import os
-import toml
-
-config = toml.load("config.toml")
-value = config["mongodb"]["uri"]
+import streamlit as st
 from src.utils.logger import logger
 
 
@@ -20,7 +17,7 @@ class VirusTotalScanner:
     """VirusTotal API integration for malware scanning"""
 
     def __init__(self):
-        self.api_key = os.getenv('VIRUSTOTAL_API_KEY')
+        self.api_key = st.secrets['api']['VIRUSTOTAL_API_KEY']
         self.base_url = "https://www.virustotal.com/api/v3"
         self.headers = {
             "x-apikey": self.api_key

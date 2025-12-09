@@ -143,7 +143,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
-config.toml
+secrets.toml
 
 # Spyder project settings
 .spyderproject
