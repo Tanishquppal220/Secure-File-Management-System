@@ -87,7 +87,8 @@ def upload_page():
             col1, col2 = st.columns(2)
             with col1:
                 if st.button("📁 View My Files"):
-                    st.switch_page("pages/dashboard.py")
+                    st.session_state.navigation = "📁 My Files"
+                    st.rerun()
             with col2:
                 if st.button("⬆️ Upload Another"):
                     st.rerun()

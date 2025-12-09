@@ -50,14 +50,14 @@ class FileManager:
                     tags: List[str] = None, scan_malware: bool = True) -> Tuple[bool, str, Optional[str]]:
         """
         Upload and encrypt a file
-        
+
         Args:
             file_obj: File object (from Streamlit or similar)
             filename: Original filename
             owner: Username of file owner
             tags: Optional list of tags
             scan_malware: Whether to scan for malware
-            
+
         Returns:
             (success: bool, message: str, file_id: Optional[str])
         """
@@ -177,11 +177,11 @@ class FileManager:
     def download_file(self, file_id: str, username: str) -> Tuple[bool, str, Optional[bytes], Optional[str]]:
         """
         Download and decrypt a file
-        
+
         Args:
             file_id: File ID
             username: Username requesting download
-            
+
         Returns:
             (success: bool, message: str, file_data: Optional[bytes], filename: Optional[str])
         """
@@ -248,13 +248,13 @@ class FileManager:
                    permissions: List[str]) -> Tuple[bool, str]:
         """
         Share a file with another user
-        
+
         Args:
             file_id: File ID
             owner: File owner username
             shared_with: Username to share with
             permissions: List of permissions (e.g., ['read', 'download'])
-            
+
         Returns:
             (success: bool, message: str)
         """
@@ -301,11 +301,11 @@ class FileManager:
     def get_file_metadata(self, file_id: str, username: str) -> Tuple[bool, str, Optional[Dict]]:
         """
         Get file metadata
-        
+
         Args:
             file_id: File ID
             username: Username requesting metadata
-            
+
         Returns:
             (success: bool, message: str, metadata: Optional[Dict])
         """
@@ -348,10 +348,10 @@ class FileManager:
     def list_user_files(self, username: str) -> List[Dict]:
         """
         List all files owned by or shared with a user
-        
+
         Args:
             username: Username
-            
+
         Returns:
             List of file metadata dictionaries
         """
@@ -363,8 +363,8 @@ class FileManager:
             }))
 
             # Find shared files
-            shared_files = list(self. files_collection.find({
-                "shared_with. username": username,
+            shared_files = list(self.files_collection.find({
+                "shared_with.username": username,
                 "is_deleted": False
             }))
 
@@ -413,11 +413,11 @@ class FileManager:
     def delete_file(self, file_id: str, username: str) -> Tuple[bool, str]:
         """
         Delete a file (soft delete)
-        
+
         Args:
             file_id: File ID
             username: Username requesting deletion
-            
+
         Returns:
             (success: bool, message: str)
         """

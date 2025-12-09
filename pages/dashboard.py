@@ -21,7 +21,8 @@ def dashboard_page():
     if not files:
         st.info("📂 No files yet. Upload your first file!")
         if st.button("⬆️ Go to Upload Page"):
-            st.switch_page("pages/upload.py")
+            st.session_state.navigation = "⬆️ Upload File"
+            st.rerun()
         return
 
     # Filter options

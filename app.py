@@ -88,9 +88,13 @@ def show_auth_page():
 def show_main_app():
     """Display main application with sidebar navigation"""
 
+    # Initialize navigation if not set
+    if 'navigation' not in st.session_state:
+        st.session_state.navigation = "📁 My Files"
+
     # Sidebar
     with st.sidebar:
-        st.markdown(f"### 👤 Welcome, {st.session_state. username}!")
+        st.markdown(f"### 👤 Welcome, {st.session_state.username}!")
         st.markdown("---")
 
         # Navigation
@@ -98,42 +102,51 @@ def show_main_app():
             "Navigation",
             ["📁 My Files", "⬆️ Upload File",
                 "🔗 Shared Files", "⚙️ Settings", "🚪 Logout"],
+            index=["📁 My Files", "⬆️ Upload File",
+                   "🔗 Shared Files", "⚙️ Settings", "🚪 Logout"].index(st.session_state.navigation),
             label_visibility="collapsed"
         )
+
+        # Update navigation state
+        st.session_state.navigation = page
 
         st.markdown("---")
         st.caption("🔐 Secure File Management System")
         st.caption("v1.0. 0 | 2025")
 
     # Main content area
-    if page == "📁 My Files":
+    if st.session_state.navigation == "📁 My Files":
         from pages.dashboard import dashboard_page
         dashboard_page()
 
-    elif page == "⬆️ Upload File":
+    elif st.session_state.navigation == "⬆️ Upload File":
         from pages.upload import upload_page
         upload_page()
 
-    elif page == "🔗 Shared Files":
+    elif st.session_state.navigation == "🔗 Shared Files":
         from pages.shared import shared_files_page
         shared_files_page()
 
-    elif page == "⚙️ Settings":
+    elif st.session_state.navigation == "⚙️ Settings":
         from pages.settings import settings_page
         settings_page()
 
-    elif page == "🚪 Logout":
+    elif st.session_state.navigation == "🚪 Logout":
         logout()
 
 
 def logout():
     """Handle user logout"""
-    from src.auth. auth_manager import AuthManager
+    from src.auth.auth_manager import AuthManager
 
     auth_manager = AuthManager()
     auth_manager.logout(st.session_state.username)
 
-    # Clear session state
+    # Clear all session state including navigation
+    for key in list(st.session_state.keys()):
+        del st.session_state[key]
+
+    # Reset authentication state
     st.session_state.authenticated = False
     st.session_state.username = None
     st.session_state.user_data = None
