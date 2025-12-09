@@ -98,7 +98,8 @@ def display_file_card(file: dict, file_manager: FileManager):
 
             # View metadata
             if st.button("ℹ️ Details", key=f"details_{file['file_id']}"):
-                show_file_details(file['file_id'], file_manager)
+                st.session_state[f"viewing_{file['file_id']}"] = True
+                st.rerun()
 
         with col4:
             st.write("")  # Spacing
@@ -106,10 +107,15 @@ def display_file_card(file: dict, file_manager: FileManager):
             if file['access_type'] == 'owner':
                 if st.button("🔗 Share", key=f"share_{file['file_id']}"):
                     st.session_state[f"sharing_{file['file_id']}"] = True
+                    st.rerun()
 
                 # Delete button
                 if st.button("🗑️ Delete", key=f"delete_{file['file_id']}"):
                     delete_file(file['file_id'], file_manager)
+
+        # Show details dialog if active
+        if st.session_state.get(f"viewing_{file['file_id']}", False):
+            show_file_details(file['file_id'], file_manager)
 
         # Sharing dialog
         if st.session_state.get(f"sharing_{file['file_id']}", False):
@@ -149,25 +155,59 @@ def show_file_details(file_id: str, file_manager: FileManager):
     )
 
     if success:
-        with st.expander("📋 File Details", expanded=True):
-            col1, col2 = st. columns(2)
+        st.info("📋 **File Details**")
 
-            with col1:
-                st. write(f"**File ID:** `{metadata['file_id']}`")
-                st.write(f"**Filename:** {metadata['filename']}")
-                st.write(f"**Owner:** {metadata['owner']}")
-                st.write(
-                    f"**Size:** {metadata['file_size'] / (1024*1024):.2f} MB")
+        col1, col2, col3 = st.columns([1, 1, 1])
 
-            with col2:
-                st.write(f"**MIME Type:** {metadata['mime_type']}")
-                st.write(f"**Access Count:** {metadata['access_count']}")
-                st.write(
-                    f"**Shared:** {'Yes' if metadata['is_shared'] else 'No'}")
-                st.write(f"**Threat Scan:** {metadata['threat_scan_status']}")
+        with col1:
+            st.write(f"**Filename:** {metadata['filename']}")
+            st.write(f"**Size:** {metadata['file_size'] / (1024*1024):.2f} MB")
+            st.write(f"**Owner:** {metadata['owner']}")
 
-            if metadata. get('tags'):
+        with col2:
+            st.write(f"**MIME Type:** {metadata['mime_type']}")
+            st.write(f"**Access Count:** {metadata['access_count']}")
+            st.write(f"**Threat Scan:** {metadata['threat_scan_status']}")
+
+        with col3:
+            st.write(f"**Shared:** {'Yes' if metadata['is_shared'] else 'No'}")
+            if metadata.get('tags'):
                 st.write(f"**Tags:** {', '.join(metadata['tags'])}")
+            st.write(f"**File ID:** `{metadata['file_id'][:8]}...`")
+
+        # Show shared users list if owner and file is shared
+        if metadata['owner'] == st.session_state.username and metadata.get('is_shared'):
+            shared_with = metadata.get('shared_with', [])
+            if shared_with:
+                st.markdown("---")
+                st.write(f"**👥 Shared With {len(shared_with)} user(s):**")
+
+                for idx, shared_user in enumerate(shared_with):
+                    col_a, col_b, col_c = st.columns([3, 5, 2])
+                    with col_a:
+                        st.write(f"👤 **{shared_user['username']}**")
+                    with col_b:
+                        perms = ', '.join(shared_user.get('permissions', []))
+                        st.caption(f"🔑 {perms}")
+                    with col_c:
+                        if st.button("🚫 Revoke", key=f"revoke_{file_id}_{idx}_{shared_user['username']}"):
+                            success_rev, msg = file_manager.unshare_file(
+                                file_id,
+                                st.session_state.username,
+                                shared_user['username']
+                            )
+                            if success_rev:
+                                st.success(msg)
+                                st.session_state[f"viewing_{file_id}"] = False
+                                st.rerun()
+                            else:
+                                st.error(msg)
+
+        # Close button
+        if st.button("❌ Close", key=f"close_details_{file_id}", use_container_width=True):
+            st.session_state[f"viewing_{file_id}"] = False
+            st.rerun()
+
     else:
         st.error(f"❌ {message}")
 

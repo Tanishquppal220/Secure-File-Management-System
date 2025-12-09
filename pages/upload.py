@@ -14,6 +14,31 @@ def upload_page():
 
     file_manager = FileManager()
 
+    # Check if we should show success message from previous upload
+    if st.session_state.get('upload_success', False):
+        st.success(
+            f"✅ {st.session_state.get('upload_message', 'File uploaded successfully!')}")
+
+        # Show file ID
+        if st.session_state.get('upload_file_id'):
+            with st.expander("📋 File Details"):
+                st.code(f"File ID: {st.session_state['upload_file_id']}")
+                st.write("Your file has been encrypted and stored securely.")
+
+        # Navigation buttons
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("📁 View My Files", key="nav_files"):
+                st.session_state.navigation = "📁 My Files"
+                st.session_state.upload_success = False
+                st.rerun()
+        with col2:
+            if st.button("⬆️ Upload Another", key="nav_upload"):
+                st.session_state.upload_success = False
+                st.rerun()
+
+        st.markdown("---")
+
     # Upload form
     with st.form("upload_form", clear_on_submit=True):
         st.subheader("📤 Select File to Upload")
@@ -75,23 +100,11 @@ def upload_page():
             )
 
         if success:
-            st.success(f"✅ {message}")
-            # st.balloons()
-
-            # Show file ID
-            with st.expander("📋 File Details"):
-                st.code(f"File ID: {file_id}")
-                st.write("Your file has been encrypted and stored securely.")
-
-            # Navigation buttons
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button("📁 View My Files"):
-                    st.session_state.navigation = "📁 My Files"
-                    st.rerun()
-            with col2:
-                if st.button("⬆️ Upload Another"):
-                    st.rerun()
+            # Store success state in session
+            st.session_state.upload_success = True
+            st.session_state.upload_message = message
+            st.session_state.upload_file_id = file_id
+            st.rerun()
         else:
             st.error(f"❌ {message}")
 

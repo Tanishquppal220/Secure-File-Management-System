@@ -298,6 +298,66 @@ class FileManager:
             logger.error(f"File share error: {e}")
             return False, f"Sharing failed: {str(e)}"
 
+    def unshare_file(self, file_id: str, owner: str, revoke_user: str) -> Tuple[bool, str]:
+        """
+        Revoke file sharing access from a user
+
+        Args:
+            file_id: File ID
+            owner: File owner username
+            revoke_user: Username to revoke access from
+
+        Returns:
+            (success: bool, message: str)
+        """
+        try:
+            # Get file
+            file_doc = self.files_collection.find_one({"file_id": file_id})
+
+            if not file_doc:
+                return False, "File not found"
+
+            # Check ownership
+            if file_doc['owner'] != owner:
+                return False, "Only the file owner can revoke access"
+
+            # Check if user exists in shared_with list
+            shared_list = file_doc.get('shared_with', [])
+            user_found = False
+            for shared in shared_list:
+                if shared['username'] == revoke_user:
+                    user_found = True
+                    break
+
+            if not user_found:
+                return False, f"File is not shared with {revoke_user}"
+
+            # Remove user from shared_with list
+            self.files_collection.update_one(
+                {"file_id": file_id},
+                {"$pull": {"shared_with": {"username": revoke_user}}}
+            )
+
+            # Update is_shared flag if no more users
+            updated_file = self.files_collection.find_one({"file_id": file_id})
+            if not updated_file.get('shared_with', []):
+                self.files_collection.update_one(
+                    {"file_id": file_id},
+                    {"$set": {"is_shared": False}}
+                )
+
+            # Log access
+            self._log_access(owner, "unshare", file_id,
+                             f"Revoked access from {revoke_user}")
+
+            logger.info(f"File unshared: {file_id} from {revoke_user}")
+
+            return True, f"Access revoked from {revoke_user}"
+
+        except Exception as e:
+            logger.error(f"File unshare error: {e}")
+            return False, f"Revoke failed: {str(e)}"
+
     def get_file_metadata(self, file_id: str, username: str) -> Tuple[bool, str, Optional[Dict]]:
         """
         Get file metadata
