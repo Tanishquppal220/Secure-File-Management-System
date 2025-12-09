@@ -7,10 +7,13 @@ import hashlib
 from typing import Dict, Tuple, Optional
 from pathlib import Path
 import os
-from dotenv import load_dotenv
+import toml
+
+config = toml.load("config.toml")
+value = config["mongodb"]["uri"]
 from src.utils.logger import logger
 
-load_dotenv()
+
 
 
 class VirusTotalScanner:

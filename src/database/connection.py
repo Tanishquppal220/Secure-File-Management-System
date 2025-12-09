@@ -4,9 +4,10 @@ MongoDB connection handler
 import os
 from pymongo import MongoClient
 from pymongo.errors import ConnectionFailure
-from dotenv import load_dotenv
+import toml
 
-load_dotenv()
+config = toml.load("config.toml")
+value = config["mongodb"]["uri"]
 
 
 class DatabaseConnection:
