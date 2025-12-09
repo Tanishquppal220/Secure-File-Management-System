@@ -246,7 +246,7 @@ Secure-File-Managment-System/
 
 ## Common Issues and Fixes
 
-1) VirusTotal host looks like `www.%20virustotal.com`  
+1) VirusTotal host looks like `www.virustotal.com`  
 Cause: extra whitespace somewhere in base URL or API key env.  
 Fix:
 - Ensure `.env` has no spaces around `=` and no trailing spaces in `VIRUSTOTAL_API_KEY`.

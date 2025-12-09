@@ -9,7 +9,7 @@ st.set_page_config(
     page_title="Secure File Management System",
     page_icon="🔐",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
 # Custom CSS
@@ -51,6 +51,9 @@ st.markdown("""
         background-color: #d1ecf1;
         border: 1px solid #bee5eb;
         color: #0c5460;
+    }
+    [data-testid="stSidebarNav"] {
+        display: none !important;
     }
     </style>
 """, unsafe_allow_html=True)
