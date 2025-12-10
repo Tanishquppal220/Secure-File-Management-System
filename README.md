@@ -4,11 +4,11 @@ A Streamlit-based secure file management web app with:
 - Encrypted file storage (AES/Fernet)
 - VirusTotal malware scanning
 - User authentication with password hashing (bcrypt)
-- Optional 2FA via TOTP (Google Authenticator)
+- Optional 2FA via TOTP (Google Authenticator, Authy, etc.)
 - File sharing with permissions
 - MongoDB for metadata and audit logs
 
-Built in Python using uv (fast Python package manager), Streamlit, PyMongo, Cryptography, and Requests.
+Built in Python using **uv** (fast Python package manager), **Streamlit**, **PyMongo**, **Cryptography**, and **Requests**.
 
 ---
 
@@ -18,12 +18,9 @@ Built in Python using uv (fast Python package manager), Streamlit, PyMongo, Cryp
 - [Prerequisites](#prerequisites)
 - [Install uv](#install-uv)
 - [Project Setup](#project-setup)
-- [Environment Variables](#environment-variables)
-- [Generate Security Keys](#generate-security-keys)
-- [Configure Gmail App Password](#configure-gmail-app-password)
+- [Configuration (Secrets)](#configuration-secrets)
 - [Configure VirusTotal API](#configure-virustotal-api)
 - [Run the App](#run-the-app)
-- [Run Validation Tests](#run-validation-tests)
 - [Project Structure](#project-structure)
 - [Common Issues and Fixes](#common-issues-and-fixes)
 - [Security Notes](#security-notes)
@@ -37,38 +34,116 @@ Run locally and open the Streamlit web UI to upload, scan, encrypt, share, and d
 ---
 
 ## Architecture
-- Frontend: Streamlit multi-page app (app.py + pages/)
-- Core services:
-  - Authentication: bcrypt password hashing, optional TOTP 2FA
-  - File operations: upload, AES (Fernet) encryption, download, sharing
-  - Threat detection: VirusTotal API (hash lookup + file upload/analysis)
-- Database: MongoDB (Atlas recommended)
-- Logging: Console + rotating daily files in logs/
+- **Frontend**: Streamlit multi-page app (`app.py` + `pages/`)
+- **Core services**:
+  - **Authentication**: bcrypt password hashing, optional TOTP 2FA
+  - **File operations**: upload, AES (Fernet) encryption, download, sharing
+  - **Threat detection**: VirusTotal API (hash lookup + file upload/analysis)
+- **Database**: MongoDB (Atlas recommended)
+- Logging: Console + rotating daily files in `logs/`
+
+---
+
+## Database Schema
+
+The application uses MongoDB with the following collections and document structures:
+
+### `users` Collection
+Stores user account information and authentication details.
+```json
+{
+  "username": "String (Unique)",
+  "email": "String (Unique)",
+  "password_hash": "String (Bcrypt hash)",
+  "role": "String ('user' or 'admin')",
+  "two_fa_enabled": "Boolean",
+  "two_fa_secret": "String (Base32 TOTP secret)",
+  "created_at": "DateTime",
+  "last_login": "DateTime",
+  "is_active": "Boolean",
+  "failed_login_attempts": "Integer",
+  "account_locked_until": "DateTime"
+}
+```
+
+### `files` Collection
+Stores metadata for uploaded files, including encryption keys and sharing permissions.
+```json
+{
+  "file_id": "String (UUID)",
+  "filename": "String",
+  "owner": "String (Username)",
+  "encrypted_path": "String (Path to encrypted file on disk)",
+  "encryption_key": "String (Base64 encoded Fernet key)",
+  "file_size": "Integer (Bytes)",
+  "mime_type": "String",
+  "uploaded_at": "DateTime",
+  "is_shared": "Boolean",
+  "shared_with": [
+    {
+      "username": "String",
+      "permissions": ["read", "download", "write", "share"],
+      "shared_at": "DateTime"
+    }
+  ],
+  "tags": ["String"],
+  "is_deleted": "Boolean (Soft delete flag)",
+  "threat_scan_status": "String ('clean', 'infected', 'pending')",
+  "threat_scan_result": "Object (VirusTotal scan details)"
+}
+```
+
+### `access_logs` Collection
+Audit trail for user actions (login, upload, download, share).
+```json
+{
+  "timestamp": "DateTime",
+  "user": "String (Username)",
+  "action": "String",
+  "file_id": "String (Optional)",
+  "details": "String",
+  "status": "String ('success', 'failed')"
+}
+```
+
+### `security_logs` Collection
+Logs for security-related events like malware detections or suspicious activities.
+```json
+{
+  "timestamp": "DateTime",
+  "event_type": "String",
+  "threat_level": "String ('low', 'medium', 'high', 'critical')",
+  "user": "String (Optional)",
+  "file_id": "String (Optional)",
+  "details": "String",
+  "resolved": "Boolean"
+}
+```
 
 ---
 
 ## Prerequisites
 - Python 3.12+
-- A MongoDB Atlas cluster (or MongoDB connection string)
-- Gmail account (for 2FA email, if used) with an App Password
-- VirusTotal API key (free tier is fine)
+- A MongoDB Atlas cluster (or local MongoDB connection string)
+- VirusTotal API key (free tier is sufficient)
+- A TOTP Authenticator app (like Google Authenticator) for 2FA
 
 ---
 
 ## Install uv
-uv is a fast Python package manager by Astral. Install it once, then use it to create and manage your virtual environment and dependencies.
+`uv` is a fast Python package manager by Astral. Install it once, then use it to create and manage your virtual environment and dependencies.
 
-- macOS / Linux (recommended):
+- **macOS / Linux** (recommended):
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-- Windows (PowerShell):
+- **Windows** (PowerShell):
 ```powershell
 irm https://astral.sh/uv/install.ps1 | iex
 ```
 
-- Alternative (via pipx):
+- **Alternative** (via pipx):
 ```bash
 pipx install uv
 ```
@@ -81,7 +156,7 @@ uv --version
 ---
 
 ## Project Setup
-Clone and set up the project with uv.
+Clone and set up the project with `uv`.
 
 ```bash
 # 1) Clone
@@ -97,74 +172,57 @@ source .venv/bin/activate
 # Windows (PowerShell):
 .venv\Scripts\Activate.ps1
 
-# 4) Install dependencies (from pyproject.toml / uv.lock)
+# 4) Install dependencies (from pyproject.toml)
 uv sync
 ```
 
-Note: You can also run commands through uv directly:
-- `uv run streamlit run app.py` (runs within the env)
-- `uv run python test_part1.py` (etc.)
-
 ---
 
-## Environment Variables
-Create a `.env` file in the project root. Use this template:
+## Configuration (Secrets)
+This application uses Streamlit's native secrets management.
+Create a file at `.streamlit/secrets.toml` in the project root.
 
-```ini
-# MongoDB
-MONGODB_URI=mongodb+srv://<user>:<pass>@<cluster>/?retryWrites=true&w=majority
-DATABASE_NAME=secure_file_mgmt
+**Template (`.streamlit/secrets.toml`):**
 
-# Security keys (see next section to generate)
-SECRET_KEY=your_generated_secret_key_here
-ENCRYPTION_KEY=your_generated_encryption_key_here
+```toml
+[mongodb]
+MONGODB_URI = "mongodb+srv://<user>:<pass>@<cluster>/?retryWrites=true&w=majority"
+DATABASE_NAME = "secure_file_mgmt"
 
-# Email (Gmail SMTP) for 2FA/email notifications
-SMTP_SERVER=smtp.gmail.com
-SMTP_PORT=587
-SENDER_EMAIL=your.email@gmail.com
-SENDER_PASSWORD=your_16_char_gmail_app_password
+[api]
+VIRUSTOTAL_API_KEY = "your_virustotal_api_key_here"
 
-# Malware scanning (VirusTotal)
-VIRUSTOTAL_API_KEY=your_64_char_virustotal_api_key
+[app]
+MAX_FILE_SIZE_MB = 50
+ALLOWED_FILE_TYPES = "pdf,txt,docx,xlsx,jpg,png,zip"
 
-# App config
-MAX_FILE_SIZE_MB=50
-ALLOWED_FILE_TYPES=pdf,txt,docx,xlsx,jpg,png,zip
-SESSION_TIMEOUT_MINUTES=30
+[email]
+SMTP_SERVER = "smtp.gmail.com"
+SMTP_PORT = 587
+SENDER_EMAIL = "your.email@gmail.com"
+SENDER_PASSWORD = "your_16_char_gmail_app_password"
 ```
 
-Important:
-- Do NOT add spaces around the equals sign, e.g. use `KEY=value` not `KEY = value`.
-- `.env` is ignored by git (see .gitignore).
-
----
-
-## Generate Security Keys
-A helper script is included to generate strong keys.
-
-```bash
-uv run python secure_key_gen.py
-```
-
-Copy the printed `SECRET_KEY` and `ENCRYPTION_KEY` into your `.env`.
+**Note:**
+- The `.streamlit/` directory and `secrets.toml` file are ignored by git to protect your credentials.
+- Ensure you have valid MongoDB credentials and a VirusTotal API key.
 
 ---
 
 ## Configure Gmail App Password
 For sending emails (e.g., 2FA codes) via Gmail SMTP:
 1. Enable 2-Step Verification in your Google Account.
-2. Go to App Passwords: https://myaccount.google.com/apppasswords
-3. Create an App Password for “Mail” → “Other (Custom name)” (e.g., Secure File Mgmt)
-4. Copy the 16-character password to `.env` as `SENDER_PASSWORD`.
+2. Go to [App Passwords](https://myaccount.google.com/apppasswords).
+3. Create an App Password for “Mail” → “Other (Custom name)” (e.g., Secure File Mgmt).
+4. Copy the 16-character password to the `SENDER_PASSWORD` field in your `secrets.toml`.
 
 ---
 
 ## Configure VirusTotal API
-1. Sign up at https://www.virustotal.com/
+1. Sign up at [VirusTotal](https://www.virustotal.com/).
 2. Verify your email and log in.
 3. Click your profile → API key → copy it.
-4. Add to `.env` as `VIRUSTOTAL_API_KEY` (no spaces before/after the key).
+4. Paste it into the `VIRUSTOTAL_API_KEY` field in your `secrets.toml`.
 
 ---
 
@@ -179,108 +237,78 @@ streamlit run app.py
 uv run streamlit run app.py
 ```
 
-Open the URL shown in the terminal (typically http://localhost:8501).
-
----
-
-## Run Validation Tests
-Quick checks to confirm each part works (run any/all that are present):
-
-```bash
-uv run python test_part1.py   # Utils, DB models, Auth primitives
-uv run python test_part2.py   # Malware scanner + file ops wiring
-uv run python test_part3.py   # Streamlit files/pages presence
-uv run python test_db.py      # Mongo connectivity check (if configured)
-uv run python test_smtp.py    # Gmail SMTP (using your app password)
-uv run python test_virustotal_fix.py  # VirusTotal path + connectivity
-```
+Open the URL shown in the terminal (typically `http://localhost:8501`).
 
 ---
 
 ## Project Structure
 ```
 Secure-File-Managment-System/
-├─ app.py
+├─ app.py               # Main entry point
 ├─ pages/
 │  ├─ __init__.py
-│  ├─ auth.py           # Login/Register/2FA
-│  ├─ dashboard.py      # My Files page
-│  ├─ upload.py         # Upload + scan + encrypt
-│  └─ shared.py         # Files shared with me
-│  └─ settings.py       # Change password, enable/disable 2FA, logs
+│  ├─ auth.py           # Login/Register/2FA views
+│  ├─ dashboard.py      # Main file management view
+│  ├─ upload.py         # Upload + scan + encrypt view
+│  ├─ shared.py         # Shared files view
+│  └─ settings.py       # User settings (Password, 2FA)
 ├─ src/
 │  ├─ __init__.py
 │  ├─ auth/
-│  │  ├─ __init__.py
-│  │  ├─ auth_manager.py
-│  │  ├─ password_manager.py
-│  │  └─ two_factor.py
+│  │  ├─ auth_manager.py     # Auth logic & user management
+│  │  ├─ password_manager.py # Hashing utilities
+│  │  └─ two_factor.py       # TOTP implementation
 │  ├─ database/
-│  │  ├─ __init__.py
-│  │  ├─ connection.py
-│  │  └─ models.py
+│  │  ├─ connection.py       # MongoDB connection
+│  │  └─ models.py           # Data models
 │  ├─ file_ops/
-│  │  ├─ __init__.py
-│  │  └─ file_manager.py
+│  │  └─ file_manager.py     # Encryption, Upload, Download logic
 │  ├─ threat_detection/
-│  │  ├─ __init__.py
-│  │  ├─ malware_scanner.py
-│  │  └─ virustotal_scanner.py
+│  │  ├─ malware_scanner.py  # Base scanner interface
+│  │  └─ virustotal_scanner.py # VirusTotal integration
 │  └─ utils/
-│     ├─ __init__.py
-│     ├─ logger.py
-│     ├─ encryption.py
-│     └─ validators.py
-├─ uploads/           # ignored (kept with .gitkeep)
-├─ encrypted_files/   # ignored (kept with .gitkeep)
-├─ logs/              # ignored (kept with .gitkeep)
-├─ .env               # ignored (your secrets live here)
-├─ pyproject.toml     # dependencies (used by uv)
-├─ uv.lock            # lockfile (for reproducible installs)
-├─ requirements.txt   # optional mirror (if present)
-├─ secure_key_gen.py
-└─ README.md
+│     ├─ logger.py           # Logging configuration
+│     ├─ encryption.py       # AES encryption helpers
+│     └─ validators.py       # Input validation
+├─ .streamlit/
+│  └─ secrets.toml      # Secrets configuration (gitignored)
+├─ encrypted_files/     # Storage for encrypted files (gitignored)
+├─ logs/                # Application logs (gitignored)
+├─ pyproject.toml       # Project dependencies
+├─ uv.lock              # Dependency lockfile
+└── README.md
 ```
 
 ---
 
 ## Common Issues and Fixes
 
-1) VirusTotal host looks like `www.virustotal.com`  
-Cause: extra whitespace somewhere in base URL or API key env.  
-Fix:
-- Ensure `.env` has no spaces around `=` and no trailing spaces in `VIRUSTOTAL_API_KEY`.
-- The code strips whitespace in the VirusTotal scanner, but still keep `.env` clean.
+1.  **VirusTotal Connection Error**:
+    *   **Cause**: Invalid API key or connection issues.
+    *   **Fix**: Check `secrets.toml` for the correct `VIRUSTOTAL_API_KEY`. Ensure you have internet access.
 
-2) PBKDF2 import error  
-Error: `cannot import name 'PBKDF2' from ...kdf.pbkdf2`  
-Fix: We use `PBKDF2HMAC` (current cryptography API). Ensure cryptography is up to date:  
-```bash
-uv sync  # or uv add cryptography --upgrade
-```
+2.  **PBKDF2 Import Error**:
+    *   **Error**: `cannot import name 'PBKDF2' from ...`
+    *   **Fix**: Ensure `cryptography` is up to date by running `uv sync`.
 
-3) Streamlit triggers 2FA setup twice  
-Cause: Streamlit reruns the script on interactions.  
-Fix: The settings page uses session-state flags (`setting_up_2fa`, etc.) to call the setup only once.
+3.  **Shared Files Not Visible**:
+    *   **Fix**: The system uses exact username matching. Ensure you shared it with the correct username.
 
-4) Shared files not visible for the other user  
-Fix: Query uses `$elemMatch` on `shared_with` to correctly retrieve shared items.
+4.  **MongoDB Connectivity**:
+    *   **Fix**: Ensure `MONGODB_URI` in `secrets.toml` is correct and your IP address is whitelisted in your MongoDB Atlas cluster settings.
 
-5) MongoDB connectivity  
-- Ensure `MONGODB_URI` is correct and your IP/network is allowed in Atlas.
 - If using SRV, your environment needs DNS that supports `_srv`.
 
-6) Gmail SMTP auth fails  
-- Use App Password, not your normal Gmail password.
-- Ensure 2-Step Verification is ON in Google Account.
+5.  **Gmail SMTP Auth Fails**:
+    *   **Fix**: Use an App Password, not your normal Gmail password. Ensure 2-Step Verification is ON in your Google Account.
 
 ---
 
 ## Security Notes
-- `.env`, `uploads/`, `encrypted_files/`, and `logs/` are ignored by git.
-- Never commit secrets (API keys, passwords) to the repository.
-- VirusTotal free tier has rate limits (4 req/min, 500 req/day); handle failures gracefully.
-- All uploaded files are encrypted on disk; keys are stored per-file in DB metadata (Fernet key as base64). Protect your DB!
+- **Git Ignore**: `.streamlit/secrets.toml`, `encrypted_files/`, and `logs/` are ignored by git to prevent sensitive data leakage.
+- **Secrets**: Never commit API keys or passwords to the repository.
+- **Encryption**: Files are encrypted at rest.
+- **VirusTotal Limits**: The free API tier has rate limits (4 req/min, 500 req/day). The app handles this, but be aware during heavy testing.
 
 ---
 
@@ -299,11 +327,17 @@ uv venv
 source .venv/bin/activate   # Windows: .venv\Scripts\Activate.ps1
 uv sync
 
-# env
-cp .env.example .env        # if present, else create .env using the template above
-uv run python secure_key_gen.py
-# paste SECRET_KEY and ENCRYPTION_KEY into .env
-# add MONGODB_URI, Gmail App password, VIRUSTOTAL_API_KEY to .env (no spaces)
+# secrets setup
+mkdir .streamlit
+# Create .streamlit/secrets.toml and add:
+# [mongodb]
+# MONGODB_URI = "..."
+# DATABASE_NAME = "secure_file_mgmt"
+# [api]
+# VIRUSTOTAL_API_KEY = "..."
+# [app]
+# MAX_FILE_SIZE_MB = 50
+# ALLOWED_FILE_TYPES = "pdf,txt,docx,xlsx,jpg,png,zip"
 
 # run
 uv run streamlit run app.py
