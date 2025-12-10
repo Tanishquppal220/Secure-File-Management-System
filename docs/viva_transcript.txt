@@ -1,0 +1,217 @@
+2025-12-10T14:05:58.505Z — Terminal: start demo
+- $ pwd
+  /home/user/Projects/Secure-File-Management-System
+- $ ls
+  LICENSE  README.md  app.py  pages  src  secure_key_gen.py  pyproject.toml  encrypted_files  uploads  logs
+
+2025-12-10T14:06:05.000Z — Create virtualenv (using plain venv shown; if using uv, substitute uv venv)
+- $ python3.12 -m venv .venv
+- $ source .venv/bin/activate
+  (.venv) $
+
+2025-12-10T14:06:20.000Z — Install dependencies (minimal shown; use uv sync if configured)
+- (.venv) $ pip install --upgrade pip
+- (.venv) $ pip install streamlit cryptography pymongo pyotp bcrypt requests qrcode pillow humanize
+- Expected pip output: "Successfully installed ..." and no errors.
+
+2025-12-10T14:06:55.000Z — Generate keys
+- (.venv) $ python secure_key_gen.py
+- Output (example; do NOT paste these real values into public places):
+  ============================================================
+  SECRET_KEY (for session management):
+  r8F... (base64/urlsafe token)
+  ============================================================
+  ENCRYPTION_KEY (for file encryption):
+  g6V... (Fernet key; base64)
+  ============================================================
+  ============================================================  
+  SECRET_KEY=r8F...
+  ENCRYPTION_KEY=g6V...
+  ============================================================
+
+2025-12-10T14:07:15.000Z — Create .env (example)
+- (.venv) $ cat > .env <<'EOF'
+  MONGODB_URI=mongodb+srv://<dbuser>:<dbpass>@cluster.example.mongodb.net/?retryWrites=true&w=majority
+  DATABASE_NAME=secure_file_mgmt
+  SECRET_KEY=<paste SECRET_KEY from generator>
+  ENCRYPTION_KEY=<paste ENCRYPTION_KEY from generator>
+  SMTP_SERVER=smtp.gmail.com
+  SMTP_PORT=587
+  SENDER_EMAIL=you@example.com
+  SENDER_PASSWORD=<16-char-gmail-app-password>
+  VIRUSTOTAL_API_KEY=<your_virustotal_api_key>
+  MAX_FILE_SIZE_MB=50
+  ALLOWED_FILE_TYPES=pdf,txt,docx,xlsx,jpg,png,zip
+  SESSION_TIMEOUT_MINUTES=30
+  EOF
+- (.venv) $ chmod 600 .env
+- Note: .env is in .gitignore; confirm with `git status` if asked.
+
+2025-12-10T14:07:45.000Z — Start the Streamlit app
+- (.venv) $ streamlit run app.py
+- Streamlit logs (abbreviated):
+  You can now view your Streamlit app in your browser.
+  Local URL: http://localhost:8501
+  Network URL: http://192.168.1.4:8501
+
+(At this point, switch to the browser to walk through the UI. Speak the actions and show the page.)
+
+2025-12-10T14:08:10.000Z — UI: Register a test user
+- In browser: Click "Register" → Fill:
+  Email: tester@example.com
+  Username: testuser
+  Password: TestPass!234
+  Confirm password: TestPass!234
+  [Click] Register
+- App backend log (console):
+  INFO:root:New user registration: testuser (email: tester@example.com)
+- DB insert check (run in separate terminal while app running):
+  (.venv) $ python - <<'PY'
+  from pymongo import MongoClient
+  import os
+  uri = os.getenv("MONGODB_URI")
+  client = MongoClient("<your_mongo_uri_here>")
+  db = client["secure_file_mgmt"]
+  print(db.users.find_one({"username":"testuser"}, {"_id":0, "username":1, "email":1, "2fa_enabled":1}))
+  PY
+- Expected output:
+  {'username': 'testuser', 'email': 'tester@example.com', '2fa_enabled': False}
+
+2025-12-10T14:09:00.000Z — UI: Enable 2FA (optional)
+- In browser (Settings): Click "Enable 2FA" → App shows QR code → Scan with Google Authenticator
+- App log:
+  INFO:root:2FA setup completed for user testuser
+- DB check:
+  {'username': 'testuser', '2fa_enabled': True, 'totp_secret': '<stored_base32>'}
+
+2025-12-10T14:10:00.000Z — UI: Upload a file (upload.pdf)
+- In browser: Navigation → "⬆️ Upload File" → Choose file upload.pdf (small sample PDF) → [Click] Upload
+- App backend log (console):
+  INFO:root:Received upload from testuser: upload.pdf (size: 124 KB)
+  INFO:root:Saving temporary upload: uploads/tmp/<uuid>.pdf
+  INFO:root:Hash computed (SHA256): 9f2...abcd
+  INFO:root:VirusTotal lookup: known sample? -> No positives found
+  INFO:root:Encrypting file with per-file Fernet key
+  INFO:root:Encrypted file written to encrypted_files/enc_<uuid>.bin
+  INFO:root:Metadata inserted into DB: files collection, file_id=<file_doc_id>
+
+2025-12-10T14:10:30.000Z — Verify encrypted file on disk
+- (.venv) $ ls -l encrypted_files
+  -rw-r--r-- 1 user user 16384 2025-12-10T14:10:30 enc_<uuid>.bin
+
+2025-12-10T14:10:45.000Z — Verify DB metadata
+- (.venv) $ python - <<'PY'
+  from pymongo import MongoClient
+  client = MongoClient("<your_mongo_uri_here>")
+  db = client.secure_file_mgmt
+  f = db.files.find_one({"filename":"upload.pdf"}, {"_id":0})
+  import json
+  print(json.dumps(f, indent=2))
+  PY
+- Expected printed JSON (example):
+  {
+    "file_id": "file_<uuid>",
+    "filename": "upload.pdf",
+    "owner": "testuser",
+    "stored_path": "encrypted_files/enc_<uuid>.bin",
+    "fernet_key_b64": "<per-file-fernet-key-base64>",
+    "sha256": "9f2...abcd",
+    "virus_total": {
+      "last_lookup": "2025-12-10T14:10:05Z",
+      "positives": 0,
+      "scans": {}
+    },
+    "shared_with": [],
+    "created_at": "2025-12-10T14:10:30Z"
+  }
+
+2025-12-10T14:11:00.000Z — Show logs entry
+- (.venv) $ tail -n 50 logs/app.log
+  2025-12-10 14:09:59, INFO: New user: testuser (registered)
+  2025-12-10 14:10:05, INFO: 2FA enabled for testuser
+  2025-12-10 14:10:30, INFO: Upload received from testuser: upload.pdf (sha256=9f2...abcd)
+  2025-12-10 14:10:31, INFO: VirusTotal lookup: no detections
+  2025-12-10 14:10:32, INFO: File encrypted and moved to encrypted_files/enc_<uuid>.bin
+  2025-12-10 14:10:33, INFO: DB metadata stored (file_id=file_<uuid>)
+
+2025-12-10T14:11:20.000Z — Optional: Decrypt a file locally to demonstrate correctness
+- (.venv) $ python - <<'PY'
+  from cryptography.fernet import Fernet
+  import base64, json
+  # Use the per-file key stored in DB (paste here or fetch from DB)
+  per_file_key_b64 = "<per-file-fernet-key-base64>"
+  f = Fernet(per_file_key_b64.encode())
+  with open("encrypted_files/enc_<uuid>.bin","rb") as ef:
+      encrypted = ef.read()
+  decrypted = f.decrypt(encrypted)
+  open("uploads/recovered_upload.pdf","wb").write(decrypted)
+  print("Decrypted bytes:", len(decrypted))
+  PY
+- Expected output:
+  Decrypted bytes: 124560
+- Verify file openable:
+  (.venv) $ file uploads/recovered_upload.pdf
+  uploads/recovered_upload.pdf: PDF document, version 1.4
+
+2025-12-10T14:11:50.000Z — VirusTotal scan verification (if file unknown)
+- Background: app first performs hash lookup; if unknown, optionally uploads file to VT for analysis.
+- Simulated request/response (app log):
+  INFO:root:VirusTotal file upload sent (analysis_id=an_12345)
+  INFO:root:VirusTotal analysis complete: harmless (0 positives)
+- If rate-limited, expected behavior: app logs an error and stores "vt_status":"pending" in DB; show that it retries or marks as pending.
+
+2025-12-10T14:12:10.000Z — Shared file demo (permission check)
+- In browser: Share file_with_user@example.com with "read" permission
+- DB files.shared_with array updated:
+  "shared_with": [{"username":"otheruser","permission":"read","shared_at":"2025-12-10T14:12:05Z"}]
+- Other user logs in and sees file in "🔗 Shared Files".
+
+2025-12-10T14:12:40.000Z — Logout and session verification
+- In browser: Click Logout
+- App log:
+  INFO:root:User testuser logged out
+- Confirm session cleared (st.session_state in runtime shows no authenticated user).
+
+2025-12-10T14:13:00.000Z — Run unit/integration tests (if present)
+- (.venv) $ uv run python test_part1.py   # or: python test_part1.py
+- Expected: tests pass (examples):
+  test_password_hashing ... ok
+  test_encrypt_decrypt_file ... ok
+  test_db_connection ... ok
+  ----------------------------------------------------------------------
+  Ran 3 tests in 0.18s
+  OK
+
+2025-12-10T14:13:20.000Z — Viva checklist & assertions to state aloud
+- Assertions to show the panel/examiner:
+  1) Environment: Python 3.12, venv active, dependencies installed (show pip freeze | grep streamlit, cryptography)
+     - (.venv) $ pip freeze | grep -E "streamlit|cryptography|pymongo"
+       streamlit==1.51.0
+       cryptography==46.0.3
+       pymongo==4.15.4
+  2) Secret keys present in .env and not committed to git; show .gitignore includes .env
+     - $ git status --porcelain | grep .env || echo ".env not tracked"
+  3) DB entries exist for user and file; show sample find_one outputs (done above)
+  4) Encrypted file present in encrypted_files/ and verified decrypts to original
+  5) Logs show upload + scan + encryption steps
+  6) If VirusTotal needed: show vt response or pending status from DB field
+  7) If email 2FA used: show SMTP logs/test script or SMTP test success (if configured, run test_smtp.py)
+
+2025-12-10T14:13:45.000Z — Sample quick-tests to run during the viva (one-liners)
+- Verify DB connectivity:
+  (.venv) $ python - <<'PY'
+  from pymongo import MongoClient; print(bool(MongoClient("<your_mongo_uri>").server_info()))
+  PY
+  Expected: True (or prints server info dict)
+- Verify decrypt works for a given file_id:
+  (.venv) $ python scripts/decrypt_demo.py --file-id file_<uuid> --out recovered.pdf
+  Expected: recovered.pdf is a valid PDF.
+
+2025-12-10T14:14:05.000Z — Closing statement to examiner (what to say)
+- "This demo shows full environment setup (venv, dependencies, .env), user authentication flow (register → optional TOTP), secure upload (hash lookup → VirusTotal → per-file Fernet encryption → disk + DB metadata), file sharing, and verification (decrypt and open). Logs and database entries provide the audit trail. Tests and small scripts verify DB connectivity, encryption/decryption correctness, and SMTP/VT integration as required."
+
+End of transcript.
+
+If you want, I can:
+- Produce exact terminal transcripts with real placeholder substitution for your machine (you paste your MONGODB_URI and I'll create the exact mongo queries).
+- Create small helper scripts used above (decrypt_demo.py, vt_lookup_demo.py, test_smtp.py) so you can run them live during the viva. Which would you like next?

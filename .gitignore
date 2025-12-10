@@ -210,4 +210,4 @@ __marimo__/
 uploads/
 encrypted_files/
 logs/*. log
-.streamlit/secrets.toml
+.streamlit/secrets.tomldocs/
