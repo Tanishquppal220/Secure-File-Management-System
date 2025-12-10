@@ -1,7 +1,6 @@
 """
 MongoDB connection handler
 """
-import os
 from pymongo import MongoClient
 from pymongo.errors import ConnectionFailure
 import streamlit as st
