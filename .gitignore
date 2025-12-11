@@ -1,25 +1,10 @@
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[codz]
-*$py.class
-
-# UV
+#UV
 uv.lock
-
-
-# Environments
-.env
-.envrc
+__pycache__/
 .venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-
-
-
-# Visual Studio Code
-.vscode/
-#Prject Spacific
-.streamlit/
+uploads/
+encrypted_files/
+logs/*.log
+.streamlit/secrets.toml
+docs/
+GEMINI.md
