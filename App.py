@@ -101,20 +101,26 @@ def show_main_app():
         page = st.radio(
             "Navigation",
             ["📁 My Files", "⬆️ Upload File",
-                "🔗 Shared Files", "⚙️ Settings", "🚪 Logout"],
+                "🔗 Shared Files", "⚙️ Settings"],
             index=["📁 My Files", "⬆️ Upload File",
-                   "🔗 Shared Files", "⚙️ Settings", "🚪 Logout"].index(st.session_state.navigation),
+                   "🔗 Shared Files", "⚙️ Settings"].index(st.session_state.navigation) if st.session_state.navigation in ["📁 My Files", "⬆️ Upload File", "🔗 Shared Files", "⚙️ Settings"] else 0,
             label_visibility="collapsed"
         )
 
-        
+        # Update navigation state
         st.session_state.navigation = page
 
+        st.markdown("---")
+        
+        # Logout button
+        if st.button("🚪 Logout", use_container_width=True):
+            logout()
+        
         st.markdown("---")
         st.caption("🔐 Secure File Management System")
         st.caption("v1.0. 0 | 2025")
 
-
+    # Main content area
     if st.session_state.navigation == "📁 My Files":
         from pages.dashboard import dashboard_page
         dashboard_page()
@@ -130,9 +136,6 @@ def show_main_app():
     elif st.session_state.navigation == "⚙️ Settings":
         from pages.settings import settings_page
         settings_page()
-
-    elif st.session_state.navigation == "🚪 Logout":
-        logout()
 
 
 def logout():
