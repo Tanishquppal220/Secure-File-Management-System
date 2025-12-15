@@ -77,6 +77,15 @@ class VirusTotalScanner:
                 time.sleep(5)  # Wait for initial scan
 
                 analysis_result = self._get_analysis_result(analysis_id)
+                
+                if analysis_result is None:
+                    return False, {
+                        "status": "timeout",
+                        "message": "Scan timed out or failed. Please try again later.",
+                        "threat_level": "unknown",
+                        "is_safe": False
+                    }
+                    
                 return self._parse_scan_result(analysis_result)
 
             return True, {
@@ -145,7 +154,7 @@ class VirusTotalScanner:
             logger.error(f"Error uploading file: {e}")
             return None
 
-    def _get_analysis_result(self, analysis_id: str, max_attempts: int = 10) -> Optional[Dict]:
+    def _get_analysis_result(self, analysis_id: str, max_attempts: int = 20) -> Optional[Dict]:
         """Get analysis result by ID (with retry)"""
         try:
             url = f"{self.base_url}/analyses/{analysis_id}"
@@ -179,7 +188,8 @@ class VirusTotalScanner:
         """Parse VirusTotal scan result"""
         try:
             attributes = result.get('data', {}).get('attributes', {})
-            stats = attributes.get('last_analysis_stats', {})
+            # Handle both file report (last_analysis_stats) and analysis report (stats)
+            stats = attributes.get('last_analysis_stats') or attributes.get('stats', {})
 
             # Get detection counts
             malicious = stats.get('malicious', 0)

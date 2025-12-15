@@ -1,5 +1,5 @@
 #UV
-uv.lock
+./uv.lock
 __pycache__/
 .venv
 uploads/
@@ -8,3 +8,4 @@ logs/*.log
 .streamlit/secrets.toml
 docs/
 GEMINI.md
+
