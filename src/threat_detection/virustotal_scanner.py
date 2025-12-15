@@ -27,12 +27,13 @@ class VirusTotalScanner:
             logger.warning(
                 "VirusTotal API key not found. Malware scanning disabled.")
 
-    def scan_file(self, file_path: str) -> Tuple[bool, Dict]:
+    def scan_file(self, file_path: str, force_scan: bool = False) -> Tuple[bool, Dict]:
         """
         Scan a file for malware using VirusTotal
         
         Args:
             file_path: Path to file to scan
+            force_scan: Whether to force a fresh scan (ignore cache)
             
         Returns:
             (is_safe: bool, result: Dict)
@@ -51,11 +52,12 @@ class VirusTotalScanner:
             logger.info(f"Scanning file with hash: {file_hash}")
 
             # Step 2: Check if file was already scanned
-            existing_result = self._get_file_report(file_hash)
+            if not force_scan:
+                existing_result = self._get_file_report(file_hash)
 
-            if existing_result:
-                logger.info("File already scanned, using cached results")
-                return self._parse_scan_result(existing_result)
+                if existing_result:
+                    logger.info("File already scanned, using cached results")
+                    return self._parse_scan_result(existing_result)
 
             # Step 3: Upload and scan file
             logger.info("Uploading file for scanning...")

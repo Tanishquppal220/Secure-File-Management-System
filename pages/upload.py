@@ -60,9 +60,11 @@ def upload_page():
         scan_malware = st.checkbox(
             "🛡️ Scan for malware (recommended)", value=True)
 
+        force_scan = False
         if scan_malware:
             st. info(
                 "ℹ️ File will be scanned using VirusTotal API.  This may take 15-30 seconds.")
+            force_scan = st.checkbox("🔄 Force fresh malware scan (ignore cache)")
 
         # Submit
         submit = st.form_submit_button(
@@ -96,7 +98,8 @@ def upload_page():
                 uploaded_file.name,
                 st.session_state.username,
                 tags,
-                scan_malware
+                scan_malware,
+                force_scan
             )
 
         if success:

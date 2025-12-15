@@ -47,7 +47,7 @@ class FileManager:
         self.malware_scanner = MalwareScanner()
 
     def upload_file(self, file_obj: BinaryIO, filename: str, owner: str,
-                    tags: List[str] = None, scan_malware: bool = True) -> Tuple[bool, str, Optional[str]]:
+                    tags: List[str] = None, scan_malware: bool = True, force_scan: bool = False) -> Tuple[bool, str, Optional[str]]:
         """
         Upload and encrypt a file
 
@@ -57,6 +57,7 @@ class FileManager:
             owner: Username of file owner
             tags: Optional list of tags
             scan_malware: Whether to scan for malware
+            force_scan: Whether to force a fresh malware scan (ignore cache)
 
         Returns:
             (success: bool, message: str, file_id: Optional[str])
@@ -97,7 +98,7 @@ class FileManager:
             if scan_malware:
                 logger.info("Starting malware scan...")
                 is_safe, scan_result = self.malware_scanner. scan_file(
-                    str(temp_path))
+                    str(temp_path), force_scan)
 
                 if not is_safe:
                     # Log security event
