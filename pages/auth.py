@@ -47,7 +47,7 @@ def login_form():
 
         # Authenticate
         auth_manager = AuthManager()
-        success, message, user_data = auth_manager. login(username, password)
+        success, message, user_data = auth_manager.login(username, password)
 
         if success:
             if message == "2fa_required":

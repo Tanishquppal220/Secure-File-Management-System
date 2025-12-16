@@ -47,7 +47,7 @@ class UserModel:
             "role": role,
             "two_fa_enabled": two_fa_enabled,
             "two_fa_secret": None,
-            "created_at": datetime.utcnow(),
+            "created_at": datetime.now(datetime.timezone.utc),
             "last_login": None,
             "is_active": True,
             "failed_login_attempts": 0,
