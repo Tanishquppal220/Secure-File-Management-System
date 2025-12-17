@@ -94,7 +94,7 @@ class AuthManager:
 
             # Check if account is locked
             if user.get('account_locked_until'):
-                if datetime.now(datetime.timezone.utc) < user['account_locked_until']:
+                if datetime.utcnow() < user['account_locked_until']:
                     return False, "Account is temporarily locked.  Please try again later.", None
                 else:
                     # Unlock account
@@ -114,7 +114,7 @@ class AuthManager:
 
                 # Lock account if max attempts exceeded
                 if failed_attempts >= self.max_failed_attempts:
-                    lockout_until = datetime.now(datetime.timezone.utc) + timedelta(minutes=self. lockout_duration_minutes)
+                    lockout_until = datetime.utcnow() + timedelta(minutes=self. lockout_duration_minutes)
                     update_data['account_locked_until'] = lockout_until
 
                     self.users_collection.update_one(
