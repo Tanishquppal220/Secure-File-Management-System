@@ -61,12 +61,12 @@ class UserModel:
         Returns: Public user data
         """
         return {
-            "username": user_doc. get("username"),
+            "username": user_doc.get("username"),
             "email": user_doc.get("email"),
             "role": user_doc.get("role"),
             "two_fa_enabled": user_doc.get("two_fa_enabled", False),
             "created_at": user_doc.get("created_at"),
-            "last_login": user_doc. get("last_login")
+            "last_login": user_doc.get("last_login")
         }
 
 
@@ -146,7 +146,7 @@ class SecurityLogModel:
         Returns: Security log document
         """
         return {
-            "timestamp": datetime. utcnow(),
+            "timestamp": datetime.utcnow(),
             "event_type": event_type,
             "threat_level": threat_level,
             "user": user,

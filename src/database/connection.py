@@ -20,7 +20,7 @@ class DatabaseConnection:
 
     def __init__(self):
         if self._client is None:
-            self. connect()
+            self.connect()
 
     def connect(self):
         """Establish MongoDB connection"""
@@ -55,12 +55,12 @@ class DatabaseConnection:
 
         # File indexes
         self._db.files.create_index("owner")
-        self._db.files. create_index("file_id", unique=True)
+        self._db.files.create_index("file_id", unique=True)
         self._db.files.create_index([("owner", 1), ("filename", 1)])
 
         # Access log indexes
-        self._db. access_logs.create_index([("timestamp", -1)])
-        self._db. access_logs.create_index("user")
+        self._db.access_logs.create_index([("timestamp", -1)])
+        self._db.access_logs.create_index("user")
 
         # Security log indexes
         self._db.security_logs.create_index([("timestamp", -1)])
@@ -75,7 +75,7 @@ class DatabaseConnection:
 
     def get_collection(self, collection_name: str):
         """Get specific collection"""
-        return self. db[collection_name]
+        return self.db[collection_name]
 
     def close(self):
         """Close database connection"""

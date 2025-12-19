@@ -3,7 +3,7 @@ Two-Factor Authentication (2FA) implementation using TOTP
 """
 import pyotp
 import qrcode
-from io import BytesIO  
+from io import BytesIO
 from typing import Optional
 
 
@@ -29,7 +29,7 @@ class TwoFactorAuth:
         Returns:
             TOTP URI string
         """
-        return pyotp.totp. TOTP(secret).provisioning_uri(
+        return pyotp.totp.TOTP(secret).provisioning_uri(
             name=username,
             issuer_name=issuer
         )

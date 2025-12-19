@@ -9,7 +9,7 @@ from typing import Optional, Tuple, Dict, List, BinaryIO
 from pathlib import Path
 from src.database.connection import db_connection
 from src.database.models import FileModel, AccessLogModel, SecurityLogModel
-from src.utils. encryption import FileEncryption
+from src.utils.encryption import FileEncryption
 from src.utils.validators import Validators
 from src.utils.logger import logger
 from src.threat_detection.malware_scanner import MalwareScanner
@@ -21,8 +21,8 @@ class FileManager:
     """Handle secure file operations with encryption"""
 
     def __init__(self):
-        self.db = db_connection. db
-        self.files_collection = self.db. files
+        self.db = db_connection.db
+        self.files_collection = self.db.files
         self.access_logs = self.db.access_logs
         self.security_logs = self.db.security_logs
 
@@ -87,7 +87,7 @@ class FileManager:
             file_id = str(uuid.uuid4())
 
             # Save temporary file
-            temp_path = self. upload_dir / f"temp_{file_id}_{filename}"
+            temp_path = self.upload_dir / f"temp_{file_id}_{filename}"
             with open(temp_path, 'wb') as f:
                 f.write(file_obj.read())
 
@@ -97,14 +97,14 @@ class FileManager:
             # Malware scan
             if scan_malware:
                 logger.info("Starting malware scan...")
-                is_safe, scan_result = self.malware_scanner. scan_file(
+                is_safe, scan_result = self.malware_scanner.scan_file(
                     str(temp_path), force_scan)
 
                 if not is_safe:
                     # Log security event
                     self._log_security_event(
                         "malware_detected",
-                        scan_result. get('threat_level', 'high'),
+                        scan_result.get('threat_level', 'high'),
                         owner,
                         file_id,
                         f"Malware detected in file: {filename}"
@@ -113,16 +113,16 @@ class FileManager:
                     # Delete temp file
                     temp_path.unlink()
 
-                    return False, f"⚠️ Security threat detected!  {scan_result. get('message')}", None
+                    return False, f"⚠️ Security threat detected!  {scan_result.get('message')}", None
 
-                logger. info(
+                logger.info(
                     f"Malware scan passed: {scan_result.get('message')}")
 
             # Generate encryption key
             encryption_key = FileEncryption.generate_key()
 
             # Encrypt file
-            encrypted_path = self. encrypted_dir / f"{file_id}. enc"
+            encrypted_path = self.encrypted_dir / f"{file_id}.enc"
             success = FileEncryption.encrypt_file(
                 str(temp_path), str(encrypted_path), encryption_key)
 
@@ -138,12 +138,12 @@ class FileManager:
                 mime_type = "application/octet-stream"
 
             # Create file document
-            file_doc = FileModel. create_file(
+            file_doc = FileModel.create_file(
                 file_id=file_id,
                 filename=filename,
                 owner=owner,
                 encrypted_path=str(encrypted_path),
-                encryption_key=encryption_key. decode('utf-8'),
+                encryption_key=encryption_key.decode('utf-8'),
                 file_size=file_size,
                 mime_type=mime_type
             )
@@ -161,7 +161,7 @@ class FileManager:
             self.files_collection.insert_one(file_doc)
 
             # Delete temp file
-            temp_path. unlink()
+            temp_path.unlink()
 
             # Log access
             self._log_access(owner, "upload", file_id,
@@ -188,7 +188,7 @@ class FileManager:
         """
         try:
             # Get file metadata
-            file_doc = self. files_collection.find_one({"file_id": file_id})
+            file_doc = self.files_collection.find_one({"file_id": file_id})
 
             if not file_doc:
                 return False, "File not found", None, None
@@ -202,7 +202,7 @@ class FileManager:
                 return False, "You don't have permission to download this file", None, None
 
             # Get encryption key
-            encryption_key = file_doc['encryption_key']. encode('utf-8')
+            encryption_key = file_doc['encryption_key'].encode('utf-8')
             encrypted_path = file_doc['encrypted_path']
 
             # Check if encrypted file exists
@@ -210,7 +210,7 @@ class FileManager:
                 return False, "Encrypted file not found on server", None, None
 
             # Decrypt file to temporary location
-            temp_decrypted = self. upload_dir / f"temp_dec_{file_id}"
+            temp_decrypted = self.upload_dir / f"temp_dec_{file_id}"
             success = FileEncryption.decrypt_file(
                 encrypted_path, str(temp_decrypted), encryption_key)
 
@@ -225,7 +225,7 @@ class FileManager:
             temp_decrypted.unlink()
 
             # Update access metadata
-            self. files_collection.update_one(
+            self.files_collection.update_one(
                 {"file_id": file_id},
                 {
                     "$set": {"last_accessed": datetime.utcnow()},
@@ -388,9 +388,9 @@ class FileManager:
                 "file_size": file_doc['file_size'],
                 "mime_type": file_doc['mime_type'],
                 "uploaded_at": file_doc['uploaded_at'],
-                "last_accessed": file_doc. get('last_accessed'),
+                "last_accessed": file_doc.get('last_accessed'),
                 "last_modified": file_doc.get('last_modified'),
-                "access_count": file_doc. get('access_count', 0),
+                "access_count": file_doc.get('access_count', 0),
                 "is_shared": file_doc.get('is_shared', False),
                 "tags": file_doc.get('tags', []),
                 "threat_scan_status": file_doc.get('threat_scan_status', 'unknown')
@@ -398,7 +398,7 @@ class FileManager:
 
             # Add sharing info if user is owner
             if file_doc['owner'] == username:
-                metadata['shared_with'] = file_doc. get('shared_with', [])
+                metadata['shared_with'] = file_doc.get('shared_with', [])
 
             return True, "Metadata retrieved", metadata
 
@@ -473,7 +473,7 @@ class FileManager:
 
     def delete_file(self, file_id: str, username: str) -> Tuple[bool, str]:
         """
-        Delete a file (soft delete)
+        Delete a file (hard delete from disk, soft delete in DB)
 
         Args:
             file_id: File ID
@@ -492,7 +492,17 @@ class FileManager:
             if file_doc['owner'] != username:
                 return False, "Only the file owner can delete files"
 
-            # Soft delete (mark as deleted)
+            # Hard delete: Remove physical file
+            try:
+                encrypted_path = Path(file_doc['encrypted_path'])
+                if encrypted_path.exists():
+                    encrypted_path.unlink()
+                    logger.info(f"Physical file removed: {encrypted_path}")
+            except Exception as e:
+                logger.error(f"Failed to remove physical file: {e}")
+                # Continue to mark as deleted in DB to prevent access
+
+            # Update DB status
             self.files_collection.update_one(
                 {"file_id": file_id},
                 {"$set": {"is_deleted": True}}

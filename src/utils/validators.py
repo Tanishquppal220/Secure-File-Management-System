@@ -57,7 +57,7 @@ class Validators:
         if not re.search(r'[A-Z]', password):
             return False, "Password must contain at least one uppercase letter"
 
-        if not re. search(r'[a-z]', password):
+        if not re.search(r'[a-z]', password):
             return False, "Password must contain at least one lowercase letter"
 
         if not re.search(r'\d', password):
@@ -78,14 +78,14 @@ class Validators:
             return False, "Filename cannot be empty"
 
         # Check for path traversal attempts
-        if '. .' in filename or '/' in filename or '\\' in filename:
+        if '..' in filename or '/' in filename or '\\' in filename:
             return False, "Invalid filename: path traversal detected"
 
         # Check extension if allowed_extensions provided
         if allowed_extensions:
             ext = filename.split('.')[-1].lower() if '.' in filename else ''
             if ext not in allowed_extensions:
-                return False, f"File type . {ext} not allowed.  Allowed types: {', '.join(allowed_extensions)}"
+                return False, f"File type .{ext} not allowed. Allowed types: {', '.join(allowed_extensions)}"
 
         return True, "Valid filename"
 
@@ -116,7 +116,7 @@ class Validators:
             '/', '_').replace('\\', '_').replace('\0', '')
 
         # Remove leading/trailing spaces and dots
-        filename = filename.strip('. ')
+        filename = filename.strip('.')
 
         # Replace multiple spaces with single space
         filename = re.sub(r'\s+', ' ', filename)

@@ -22,13 +22,13 @@ st.markdown("""
         text-align: center;
         padding: 1rem;
     }
-    . sub-header {
+    .sub-header {
         font-size: 1.2rem;
         color: #666;
         text-align: center;
         padding-bottom: 2rem;
     }
-    . stButton>button {
+    .stButton>button {
         width: 100%;
     }
     .success-box {
@@ -40,7 +40,7 @@ st.markdown("""
     }
     .error-box {
         padding: 1rem;
-        border-radius: 0. 5rem;
+        border-radius: 0.5rem;
         background-color: #f8d7da;
         border: 1px solid #f5c6cb;
         color: #721c24;
@@ -61,7 +61,7 @@ st.markdown("""
 # Initialize session state
 if 'authenticated' not in st.session_state:
     st.session_state.authenticated = False
-    st. session_state.username = None
+    st.session_state.username = None
     st.session_state.user_data = None
     st.session_state.awaiting_2fa = False
 
@@ -111,14 +111,14 @@ def show_main_app():
         st.session_state.navigation = page
 
         st.markdown("---")
-        
+
         # Logout button
         if st.button("🚪 Logout", use_container_width=True):
             logout()
-        
+
         st.markdown("---")
         st.caption("🔐 Secure File Management System")
-        st.caption("v1.0. 0 | 2025")
+        st.caption("v1.0.0 | 2025")
 
     # Main content area
     if st.session_state.navigation == "📁 My Files":

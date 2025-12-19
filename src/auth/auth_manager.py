@@ -6,11 +6,12 @@ from typing import Optional, Dict, Tuple
 from src.database.connection import db_connection
 from src.database.models import UserModel, AccessLogModel
 from src.auth.password_manager import PasswordManager
-from src. auth.two_factor import TwoFactorAuth
+from src.auth.two_factor import TwoFactorAuth
 from src.utils.validators import Validators
 from src.utils.logger import logger
-from io import BytesIO  
+from io import BytesIO
 from typing import Optional
+
 
 class AuthManager:
     """Manage user authentication and authorization"""
@@ -95,7 +96,7 @@ class AuthManager:
             # Check if account is locked
             if user.get('account_locked_until'):
                 if datetime.utcnow() < user['account_locked_until']:
-                    return False, "Account is temporarily locked.  Please try again later.", None
+                    return False, "Account is temporarily locked. Please try again later.", None
                 else:
                     # Unlock account
                     self.users_collection.update_one(
@@ -114,7 +115,7 @@ class AuthManager:
 
                 # Lock account if max attempts exceeded
                 if failed_attempts >= self.max_failed_attempts:
-                    lockout_until = datetime.utcnow() + timedelta(minutes=self. lockout_duration_minutes)
+                    lockout_until = datetime.utcnow() + timedelta(minutes=self.lockout_duration_minutes)
                     update_data['account_locked_until'] = lockout_until
 
                     self.users_collection.update_one(
@@ -124,9 +125,9 @@ class AuthManager:
 
                     self._log_access(username, "login", status="blocked",
                                      details="Account locked due to multiple failed attempts")
-                    return False, f"Too many failed attempts. Account locked for {self.lockout_duration_minutes} minutes.", None
+                    return False, f"Too many failed attempts.Account locked for {self.lockout_duration_minutes} minutes.", None
 
-                self. users_collection.update_one(
+                self.users_collection.update_one(
                     {"username": username},
                     {"$set": update_data}
                 )
@@ -208,7 +209,7 @@ class AuthManager:
             (success: bool, message: str, secret: Optional[str], qr_code: Optional[BytesIO])
         """
         try:
-            user = self.users_collection. find_one({"username": username})
+            user = self.users_collection.find_one({"username": username})
 
             if not user:
                 return False, "User not found", None, None
@@ -257,7 +258,7 @@ class AuthManager:
 
             # Verify token
             if not self.two_fa.verify_totp(user['two_fa_secret'], token):
-                return False, "Invalid code.  Please try again."
+                return False, "Invalid code. Please try again."
 
             # Enable 2FA
             self.users_collection.update_one(
@@ -329,7 +330,7 @@ class AuthManager:
                 return False, "User not found"
 
             # Verify old password
-            if not self.password_manager. verify_password(old_password, user['password_hash']):
+            if not self.password_manager.verify_password(old_password, user['password_hash']):
                 self._log_access(username, "password_change", status="failed",
                                  details="Invalid old password")
                 return False, "Current password is incorrect"
@@ -344,13 +345,13 @@ class AuthManager:
                 new_password)
 
             # Update password
-            self.users_collection. update_one(
+            self.users_collection.update_one(
                 {"username": username},
                 {"$set": {"password_hash": new_password_hash}}
             )
 
             self._log_access(username, "password_change", status="success")
-            logger. info(f"Password changed for user: {username}")
+            logger.info(f"Password changed for user: {username}")
 
             return True, "Password changed successfully"
 
@@ -362,7 +363,7 @@ class AuthManager:
                     status: str = "success", details: Optional[str] = None):
         """Log access event"""
         try:
-            log_entry = AccessLogModel. create_log(
+            log_entry = AccessLogModel.create_log(
                 user, action, file_id, details, status)
             self.access_logs.insert_one(log_entry)
         except Exception as e:
@@ -372,7 +373,7 @@ class AuthManager:
         """Get user data by username"""
         user = self.users_collection.find_one({"username": username})
         if user:
-            return UserModel. get_public_fields(user)
+            return UserModel.get_public_fields(user)
         return None
 
     def logout(self, username: str):

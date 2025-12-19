@@ -11,8 +11,6 @@ import streamlit as st
 from src.utils.logger import logger
 
 
-
-
 class VirusTotalScanner:
     """VirusTotal API integration for malware scanning"""
 
@@ -25,16 +23,16 @@ class VirusTotalScanner:
 
         if not self.api_key:
             logger.warning(
-                "VirusTotal API key not found. Malware scanning disabled.")
+                "VirusTotal API key not found.Malware scanning disabled.")
 
     def scan_file(self, file_path: str, force_scan: bool = False) -> Tuple[bool, Dict]:
         """
         Scan a file for malware using VirusTotal
-        
+
         Args:
             file_path: Path to file to scan
             force_scan: Whether to force a fresh scan (ignore cache)
-            
+
         Returns:
             (is_safe: bool, result: Dict)
         """
@@ -75,20 +73,29 @@ class VirusTotalScanner:
             analysis_id = scan_result.get('data', {}).get('id')
 
             if analysis_id:
-                logger.info(f"File uploaded.  Analysis ID: {analysis_id}")
+                logger.info(f"File uploaded.Analysis ID: {analysis_id}")
                 time.sleep(5)  # Wait for initial scan
 
                 analysis_result = self._get_analysis_result(analysis_id)
-                
+
                 if analysis_result is None:
+                    logger.error("Failed to get analysis result")
                     return False, {
                         "status": "timeout",
-                        "message": "Scan timed out or failed. Please try again later.",
+                        "message": "Scan timed out or failed.Please try again later.",
                         "threat_level": "unknown",
                         "is_safe": False
                     }
-                    
+
                 return self._parse_scan_result(analysis_result)
+            else:
+                logger.error("No analysis ID returned from upload")
+                return False, {
+                    "status": "error",
+                    "message": "Failed to initiate scan - no analysis ID",
+                    "threat_level": "unknown",
+                    "is_safe": False
+                }
 
             return True, {
                 "status": "pending",
@@ -98,7 +105,7 @@ class VirusTotalScanner:
             }
 
         except Exception as e:
-            logger. error(f"VirusTotal scan error: {e}")
+            logger.error(f"VirusTotal scan error: {e}")
             return False, {
                 "status": "error",
                 "message": str(e),
@@ -112,9 +119,9 @@ class VirusTotalScanner:
 
         with open(file_path, "rb") as f:
             for byte_block in iter(lambda: f.read(4096), b""):
-                sha256_hash. update(byte_block)
+                sha256_hash.update(byte_block)
 
-        return sha256_hash. hexdigest()
+        return sha256_hash.hexdigest()
 
     def _get_file_report(self, file_hash: str) -> Optional[Dict]:
         """Get existing file report by hash"""
@@ -128,7 +135,7 @@ class VirusTotalScanner:
             return None
 
         except Exception as e:
-            logger. error(f"Error getting file report: {e}")
+            logger.error(f"Error getting file report: {e}")
             return None
 
     def _upload_file(self, file_path: str) -> Optional[Dict]:
@@ -170,16 +177,19 @@ class VirusTotalScanner:
                         'attributes', {}).get('status')
 
                     if status == 'completed':
+                        logger.info("Scan completed successfully")
                         return data
 
                     logger.info(
-                        f"Scan in progress... (attempt {attempt + 1}/{max_attempts})")
+                        f"Scan in progress...(attempt {attempt + 1}/{max_attempts}) - Status: {status}")
                     time.sleep(3)
                 else:
                     logger.error(
-                        f"Error getting analysis: {response.status_code}")
+                        f"Error getting analysis: {response.status_code} - {response.text}")
                     break
 
+            logger.warning(
+                f"Scan did not complete after {max_attempts} attempts")
             return None
 
         except Exception as e:
@@ -189,13 +199,42 @@ class VirusTotalScanner:
     def _parse_scan_result(self, result: Dict) -> Tuple[bool, Dict]:
         """Parse VirusTotal scan result"""
         try:
+            # Validate result structure
+            if not result or 'data' not in result:
+                logger.error("Invalid scan result: missing data")
+                return False, {
+                    "status": "error",
+                    "message": "Invalid scan result structure",
+                    "threat_level": "unknown",
+                    "is_safe": False
+                }
+
             attributes = result.get('data', {}).get('attributes', {})
+            if not attributes:
+                logger.error("Invalid scan result: missing attributes")
+                return False, {
+                    "status": "error",
+                    "message": "Invalid scan result attributes",
+                    "threat_level": "unknown",
+                    "is_safe": False
+                }
+
             # Handle both file report (last_analysis_stats) and analysis report (stats)
-            stats = attributes.get('last_analysis_stats') or attributes.get('stats', {})
+            stats = attributes.get(
+                'last_analysis_stats') or attributes.get('stats', {})
+
+            if not stats:
+                logger.warning("No stats found in scan result")
+                return False, {
+                    "status": "error",
+                    "message": "No scan statistics available",
+                    "threat_level": "unknown",
+                    "is_safe": False
+                }
 
             # Get detection counts
             malicious = stats.get('malicious', 0)
-            suspicious = stats. get('suspicious', 0)
+            suspicious = stats.get('suspicious', 0)
             undetected = stats.get('undetected', 0)
             harmless = stats.get('harmless', 0)
 
@@ -244,6 +283,6 @@ class VirusTotalScanner:
         if malicious > 0:
             return f"⚠️ THREAT DETECTED!  {malicious} antivirus engines detected malware"
         elif suspicious > 0:
-            return f"⚠️ Suspicious file.  {suspicious} engines flagged as suspicious"
+            return f"⚠️ Suspicious file. {suspicious} engines flagged as suspicious"
         else:
-            return "✅ No threats detected.  File appears safe."
+            return "✅ No threats detected. File appears safe."

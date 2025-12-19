@@ -21,28 +21,28 @@ class FileEncryption:
         """
         return Fernet.generate_key()
 
-    @staticmethod
-    def derive_key_from_password(password: str, salt: bytes = None) -> Tuple[bytes, bytes]:
-        """
-        Derive encryption key from password using PBKDF2HMAC
-        Args:
-            password: Password to derive key from
-            salt: Salt for key derivation (generated if None)
-        Returns:
-            (key, salt) tuple
-        """
-        if salt is None:
-            salt = os.urandom(16)
+    # @staticmethod
+    # def derive_key_from_password(password: str, salt: bytes = None) -> Tuple[bytes, bytes]:
+    #     """
+    #     Derive encryption key from password using PBKDF2HMAC
+    #     Args:
+    #         password: Password to derive key from
+    #         salt: Salt for key derivation (generated if None)
+    #     Returns:
+    #         (key, salt) tuple
+    #     """
+    #     if salt is None:
+    #         salt = os.urandom(16)
 
-        kdf = PBKDF2HMAC(
-            algorithm=hashes.SHA256(),
-            length=32,
-            salt=salt,
-            iterations=100000,
-            backend=default_backend()
-        )
-        key = base64.urlsafe_b64encode(kdf.derive(password.encode()))
-        return key, salt
+    #     kdf = PBKDF2HMAC(
+    #         algorithm=hashes.SHA256(),
+    #         length=32,
+    #         salt=salt,
+    #         iterations=100000,
+    #         backend=default_backend()
+    #     )
+    #     key = base64.urlsafe_b64encode(kdf.derive(password.encode()))
+    #     return key, salt
 
     @staticmethod
     def encrypt_file(input_path: str, output_path: str, key: bytes) -> bool:
@@ -66,7 +66,7 @@ class FileEncryption:
             encrypted_data = fernet.encrypt(original_data)
 
             # Write encrypted data
-            with open(output_path, 'wb') as file:
+            with open(output_path, 'wb') as file: # Acquire exclusive lock
                 file.write(encrypted_data)
 
             return True
@@ -91,6 +91,7 @@ class FileEncryption:
 
             # Read encrypted file
             with open(input_path, 'rb') as file:
+
                 encrypted_data = file.read()
 
             # Decrypt data

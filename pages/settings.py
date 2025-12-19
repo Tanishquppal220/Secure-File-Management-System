@@ -2,7 +2,7 @@
 User settings page - FIXED VERSION
 """
 import streamlit as st
-from src.auth. auth_manager import AuthManager
+from src.auth.auth_manager import AuthManager
 
 
 def settings_page():
@@ -73,7 +73,7 @@ def security_settings():
             )
 
             if success:
-                st. success(f"✅ {message}")
+                st.success(f"✅ {message}")
             else:
                 st.error(f"❌ {message}")
 
@@ -93,7 +93,7 @@ def security_settings():
     else:
         # Show 2FA status and enable/disable buttons
         if not user_data.get('two_fa_enabled'):
-            st. info(
+            st.info(
                 "📱 Two-Factor Authentication adds an extra layer of security to your account.")
 
             if st.button("🔓 Enable 2FA", key="btn_enable_2fa"):
@@ -103,7 +103,7 @@ def security_settings():
             st.success("✅ Two-Factor Authentication is enabled")
 
             if st.button("🔒 Disable 2FA", key="btn_disable_2fa"):
-                st.session_state. disabling_2fa = True
+                st.session_state.disabling_2fa = True
                 st.rerun()
 
 
@@ -116,7 +116,7 @@ def show_2fa_setup_process():
     if 'twofa_secret' not in st.session_state:
         # Only call enable_2fa once
         auth_manager = AuthManager()
-        success, message, secret, qr_code = auth_manager. enable_2fa(
+        success, message, secret, qr_code = auth_manager.enable_2fa(
             st.session_state.username)
 
         if success:
@@ -127,14 +127,14 @@ def show_2fa_setup_process():
         else:
             st.error(f"❌ {message}")
             if st.button("« Back"):
-                st.session_state. setting_up_2fa = False
+                st.session_state.setting_up_2fa = False
                 st.rerun()
             return
 
     # Display QR code and setup instructions
     st.success(st.session_state.twofa_message)
 
-    col1, col2 = st. columns([1, 1])
+    col1, col2 = st.columns([1, 1])
 
     with col1:
         st.markdown("#### Step 1: Scan QR Code")
@@ -158,7 +158,7 @@ def show_2fa_setup_process():
     st.markdown("---")
     st.markdown("#### Step 3: Verify Setup")
 
-    with st. form("verify_2fa_setup"):
+    with st.form("verify_2fa_setup"):
         token = st.text_input(
             "Enter 6-digit code from your app", max_chars=6, placeholder="000000")
 
@@ -187,7 +187,7 @@ def show_2fa_setup_process():
 
                 # Clear 2FA setup data
                 del st.session_state.twofa_secret
-                del st. session_state.twofa_qr_code
+                del st.session_state.twofa_qr_code
                 del st.session_state.twofa_message
                 st.session_state.setting_up_2fa = False
 
@@ -200,7 +200,7 @@ def show_2fa_setup_process():
     if cancel:
         # Clear 2FA setup data
         if 'twofa_secret' in st.session_state:
-            del st.session_state. twofa_secret
+            del st.session_state.twofa_secret
         if 'twofa_qr_code' in st.session_state:
             del st.session_state.twofa_qr_code
         if 'twofa_message' in st.session_state:
@@ -214,7 +214,7 @@ def show_2fa_disable_process():
 
     st.warning("⚠️ Disabling Two-Factor Authentication")
     st.markdown(
-        "This will reduce your account security. You'll need to enter your password to confirm.")
+        "This will reduce your account security.You'll need to enter your password to confirm.")
 
     with st.form("disable_2fa_form"):
         password = st.text_input(
@@ -225,7 +225,7 @@ def show_2fa_disable_process():
             submit = st.form_submit_button(
                 "🔓 Disable 2FA", use_container_width=True)
         with col_b:
-            cancel = st. form_submit_button(
+            cancel = st.form_submit_button(
                 "❌ Cancel", use_container_width=True)
 
     if submit:
@@ -234,7 +234,7 @@ def show_2fa_disable_process():
         else:
             auth_manager = AuthManager()
             success, message = auth_manager.disable_2fa(
-                st.session_state. username, password)
+                st.session_state.username, password)
 
             if success:
                 st.success(f"✅ {message}")
@@ -246,7 +246,7 @@ def show_2fa_disable_process():
 
     if cancel:
         st.session_state.disabling_2fa = False
-        st. rerun()
+        st.rerun()
 
 
 def activity_logs():
@@ -259,7 +259,7 @@ def activity_logs():
     # Get recent logs
     logs = list(db_connection.db.access_logs.find(
         {"user": st.session_state.username}
-    ). sort("timestamp", -1).limit(20))
+    ).sort("timestamp", -1).limit(20))
 
     if not logs:
         st.info("No activity logs found.")
@@ -267,8 +267,8 @@ def activity_logs():
 
     # Display logs in a table format
     for i, log in enumerate(logs):
-        with st.expander(f"📋 {log['action']. upper()} - {log['timestamp']. strftime('%Y-%m-%d %H:%M:%S')}", expanded=(i == 0)):
-            col1, col2 = st. columns(2)
+        with st.expander(f"📋 {log['action'].upper()} - {log['timestamp'].strftime('%Y-%m-%d %H:%M:%S')}", expanded=(i == 0)):
+            col1, col2 = st.columns(2)
 
             with col1:
                 st.write(f"**Action:** {log['action']}")
@@ -277,11 +277,11 @@ def activity_logs():
                     f"**Time:** {log['timestamp'].strftime('%Y-%m-%d %H:%M:%S')}")
 
             with col2:
-                if log. get('file_id'):
+                if log.get('file_id'):
                     st.write(f"**File ID:** `{log['file_id']}`")
                 if log.get('details'):
                     st.write(f"**Details:** {log['details']}")
-                if log. get('ip_address'):
+                if log.get('ip_address'):
                     st.write(f"**IP Address:** {log['ip_address']}")
 
             # Status indicator

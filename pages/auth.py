@@ -11,7 +11,7 @@ def auth_page():
 
     st.markdown('<div class="main-header">🔐 Secure File Management System</div>',
                 unsafe_allow_html=True)
-    st.markdown('<div class="sub-header">Secure.  Encrypted. Protected.</div>',
+    st.markdown('<div class="sub-header">Secure. Encrypted.Protected.</div>',
                 unsafe_allow_html=True)
 
     # Tabs for Login and Register
@@ -34,7 +34,7 @@ def login_form():
         password = st.text_input(
             "Password", type="password", placeholder="Enter your password")
 
-        col1, col2 = st. columns([1, 1])
+        col1, col2 = st.columns([1, 1])
         with col1:
             submit = st.form_submit_button("🔓 Login", use_container_width=True)
         with col2:
@@ -54,14 +54,14 @@ def login_form():
                 # 2FA required
                 st.session_state.awaiting_2fa = True
                 st.session_state.temp_username = username
-                st. session_state.user_data = user_data
+                st.session_state.user_data = user_data
                 st.info("🔐 Two-Factor Authentication Required")
                 st.rerun()
             else:
                 # Login successful
                 st.session_state.authenticated = True
                 st.session_state.username = username
-                st. session_state.user_data = user_data
+                st.session_state.user_data = user_data
                 st.success(f"✅ {message}")
                 logger.info(f"User logged in: {username}")
                 st.rerun()
@@ -78,7 +78,7 @@ def show_2fa_verification():
 
     st.markdown("---")
     st.subheader("🔐 Two-Factor Authentication")
-    st. info("Enter the 6-digit code from your authenticator app")
+    st.info("Enter the 6-digit code from your authenticator app")
 
     with st.form("2fa_form"):
         token = st.text_input("6-Digit Code", max_chars=6,
@@ -91,7 +91,7 @@ def show_2fa_verification():
             return
 
         auth_manager = AuthManager()
-        success, message, user_data = auth_manager. verify_2fa_and_login(
+        success, message, user_data = auth_manager.verify_2fa_and_login(
             st.session_state.temp_username,
             token
         )
@@ -100,7 +100,7 @@ def show_2fa_verification():
             st.session_state.authenticated = True
             st.session_state.username = st.session_state.temp_username
             st.session_state.user_data = user_data
-            st. session_state.awaiting_2fa = False
+            st.session_state.awaiting_2fa = False
             st.success(f"✅ {message}")
             st.rerun()
         else:
@@ -110,7 +110,7 @@ def show_2fa_verification():
 def register_form():
     """Registration form"""
 
-    st. subheader("Create New Account")
+    st.subheader("Create New Account")
 
     with st.form("register_form"):
         username = st.text_input(

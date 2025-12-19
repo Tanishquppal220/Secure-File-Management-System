@@ -16,10 +16,10 @@ def dashboard_page():
     file_manager = FileManager()
 
     # Get user files
-    files = file_manager. list_user_files(st.session_state.username)
+    files = file_manager.list_user_files(st.session_state.username)
 
     if not files:
-        st.info("📂 No files yet. Upload your first file!")
+        st.info("📂 No files yet.Upload your first file!")
         if st.button("⬆️ Go to Upload Page"):
             st.session_state.navigation = "⬆️ Upload File"
             st.rerun()
@@ -222,7 +222,7 @@ def show_share_dialog(file_id: str, file_manager: FileManager):
             "Share with username", placeholder="Enter username")
 
         st.write("**Permissions:**")
-        col1, col2 = st. columns(2)
+        col1, col2 = st.columns(2)
         with col1:
             perm_read = st.checkbox("Read", value=True)
             perm_download = st.checkbox("Download", value=True)
@@ -255,7 +255,7 @@ def show_share_dialog(file_id: str, file_manager: FileManager):
 
         success, message = file_manager.share_file(
             file_id,
-            st.session_state. username,
+            st.session_state.username,
             share_with,
             permissions
         )
@@ -306,4 +306,4 @@ def get_file_icon(filename: str) -> str:
         'mp3': '🎵', 'wav': '🎵',
     }
 
-    return icons. get(ext, '📄')
+    return icons.get(ext, '📄')

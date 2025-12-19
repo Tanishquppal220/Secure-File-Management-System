@@ -38,17 +38,17 @@ def shared_files_page():
                 st.caption(f"📊 Size: {size_mb:.2f} MB")
 
             with col2:
-                st. write("")
                 st.write("")
-                permissions = file. get('permissions', [])
+                st.write("")
+                permissions = file.get('permissions', [])
                 st.write("**Your Permissions:**")
                 for perm in permissions:
-                    st.caption(f"✓ {perm. capitalize()}")
+                    st.caption(f"✓ {perm.capitalize()}")
 
             with col3:
                 st.write("")
                 # Download if permitted
-                if 'download' in file. get('permissions', []) or 'read' in file.get('permissions', []):
+                if 'download' in file.get('permissions', []) or 'read' in file.get('permissions', []):
                     if st.button("⬇️ Download", key=f"dl_shared_{file['file_id']}"):
                         download_shared_file(
                             file['file_id'], file['filename'], file_manager)
@@ -61,10 +61,10 @@ def shared_files_page():
 def download_shared_file(file_id: str, filename: str, file_manager: FileManager):
     """Download a shared file"""
 
-    with st.spinner("Downloading file... "):
+    with st.spinner("Downloading file..."):
         success, message, file_data, _ = file_manager.download_file(
             file_id,
-            st.session_state. username
+            st.session_state.username
         )
 
     if success:

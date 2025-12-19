@@ -33,7 +33,7 @@ class AppLogger:
         console_handler.setLevel(logging.INFO)
 
         # Formatter
-        formatter = logging. Formatter(
+        formatter = logging.Formatter(
             '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
             datefmt='%Y-%m-%d %H:%M:%S'
         )
@@ -42,11 +42,11 @@ class AppLogger:
 
         # Add handlers
         self.logger.addHandler(file_handler)
-        self. logger.addHandler(console_handler)
+        self.logger.addHandler(console_handler)
 
     def debug(self, message: str):
         """Log debug message"""
-        self.logger. debug(message)
+        self.logger.debug(message)
 
     def info(self, message: str):
         """Log info message"""
@@ -58,11 +58,11 @@ class AppLogger:
 
     def error(self, message: str):
         """Log error message"""
-        self. logger.error(message)
+        self.logger.error(message)
 
     def critical(self, message: str):
         """Log critical message"""
-        self.logger. critical(message)
+        self.logger.critical(message)
 
 
 # Global logger instance

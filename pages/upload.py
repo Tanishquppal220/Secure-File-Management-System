@@ -62,9 +62,10 @@ def upload_page():
 
         force_scan = False
         if scan_malware:
-            st. info(
-                "ℹ️ File will be scanned using VirusTotal API.  This may take 15-30 seconds.")
-            force_scan = st.checkbox("🔄 Force fresh malware scan (ignore cache)")
+            st.info(
+                "ℹ️ File will be scanned using VirusTotal API. This may take 15-30 seconds.")
+            force_scan = st.checkbox(
+                "🔄 Force fresh malware scan (ignore cache)")
 
         # Submit
         submit = st.form_submit_button(
@@ -84,12 +85,12 @@ def upload_page():
             st.write(f"📄 **Name:** {uploaded_file.name}")
             st.write(f"📊 **Size:** {uploaded_file.size / (1024*1024):.2f} MB")
         with col2:
-            st. write(f"📑 **Type:** {uploaded_file.type}")
+            st.write(f"📑 **Type:** {uploaded_file.type}")
             if tags:
                 st.write(f"🏷️ **Tags:** {', '.join(tags)}")
 
         # Upload
-        with st.spinner("Uploading and encrypting file..." + (" (Scanning for malware... )" if scan_malware else "")):
+        with st.spinner("Uploading and encrypting file..." + (" (Scanning for malware...)" if scan_malware else "")):
             # Convert to BytesIO
             file_obj = BytesIO(uploaded_file.read())
 
@@ -111,7 +112,7 @@ def upload_page():
         else:
             st.error(f"❌ {message}")
 
-            if "threat detected" in message. lower():
+            if "threat detected" in message.lower():
                 st.warning(
                     "🛡️ **Security Alert:** The file was blocked for your protection.")
 
@@ -121,7 +122,7 @@ def upload_page():
     # Upload guidelines
     st.markdown("---")
     with st.expander("📖 Upload Guidelines"):
-        st. markdown(f"""
+        st.markdown(f"""
         **File Requirements:**
         - Maximum file size: {file_manager.max_file_size / (1024*1024):.0f} MB
         - Allowed file types: {', '.join(file_manager.allowed_extensions)}
