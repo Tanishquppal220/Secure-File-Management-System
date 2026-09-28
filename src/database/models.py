@@ -1,8 +1,7 @@
 """
 Database models and schemas
 """
-from datetime import datetime
-from typing import List, Dict
+from datetime import datetime, timezone
 from enum import Enum
 
 
@@ -35,7 +34,7 @@ class UserModel:
 
     @staticmethod
     def create_user(username: str, email: str, password_hash: str,
-                    role: str = "user", two_fa_enabled: bool = False) -> Dict:
+                    role: str = "user", two_fa_enabled: bool = False) -> dict:
         """
         Create user document
         Returns: User document dictionary
@@ -47,15 +46,15 @@ class UserModel:
             "role": role,
             "two_fa_enabled": two_fa_enabled,
             "two_fa_secret": None,
-            "created_at": datetime.now(datetime.timezone.utc),
+            "created_at": datetime.now(timezone.utc),
             "last_login": None,
             "is_active": True,
             "failed_login_attempts": 0,
-            "account_locked_until": None
+            "account_locked_until": None,
         }
 
     @staticmethod
-    def get_public_fields(user_doc: Dict) -> Dict:
+    def get_public_fields(user_doc: dict) -> dict:
         """
         Get safe user fields (exclude sensitive data)
         Returns: Public user data
@@ -76,7 +75,7 @@ class FileModel:
     @staticmethod
     def create_file(file_id: str, filename: str, owner: str,
                     encrypted_path: str, encryption_key: str,
-                    file_size: int, mime_type: str) -> Dict:
+                    file_size: int, mime_type: str) -> dict:
         """
         Create file document
         Returns: File document dictionary
@@ -102,7 +101,7 @@ class FileModel:
         }
 
     @staticmethod
-    def add_shared_user(username: str, permissions: List[str]) -> Dict:
+    def add_shared_user(username: str, permissions: list[str]) -> dict:
         """
         Create shared user entry
         Returns: Shared user document
@@ -119,7 +118,7 @@ class AccessLogModel:
 
     @staticmethod
     def create_log(user: str, action: str, file_id: str = None,
-                   details: str = None, status: str = "success") -> Dict:
+                   details: str = None, status: str = "success") -> dict:
         """
         Create access log entry
         Returns: Log document
@@ -140,7 +139,7 @@ class SecurityLogModel:
 
     @staticmethod
     def create_log(event_type: str, threat_level: str, user: str = None,
-                   file_id: str = None, details: str = "") -> Dict:
+                   file_id: str = None, details: str = "") -> dict:
         """
         Create security log entry
         Returns: Security log document
