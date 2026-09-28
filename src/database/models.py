@@ -1,7 +1,7 @@
 """
 Database models and schemas
 """
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 
 
@@ -46,7 +46,7 @@ class UserModel:
             "role": role,
             "two_fa_enabled": two_fa_enabled,
             "two_fa_secret": None,
-            "created_at": datetime.now(timezone.utc),
+            "created_at": datetime.now(UTC),
             "last_login": None,
             "is_active": True,
             "failed_login_attempts": 0,
@@ -88,9 +88,9 @@ class FileModel:
             "encryption_key": encryption_key,
             "file_size": file_size,
             "mime_type": mime_type,
-            "uploaded_at": datetime.utcnow(),
-            "last_accessed": datetime.utcnow(),
-            "last_modified": datetime.utcnow(),
+            "uploaded_at": datetime.now(UTC),
+            "last_accessed": datetime.now(UTC),
+            "last_modified": datetime.now(UTC),
             "access_count": 0,
             "is_shared": False,
             "shared_with": [],
@@ -109,7 +109,7 @@ class FileModel:
         return {
             "username": username,
             "permissions": permissions,
-            "shared_at": datetime.utcnow()
+            "shared_at": datetime.now(UTC)
         }
 
 
@@ -117,14 +117,14 @@ class AccessLogModel:
     """Access log model"""
 
     @staticmethod
-    def create_log(user: str, action: str, file_id: str = None,
-                   details: str = None, status: str = "success") -> dict:
+    def create_log(user: str, action: str, file_id: str|None = None,
+                   details: str|None = None, status: str = "success") -> dict:
         """
         Create access log entry
         Returns: Log document
         """
         return {
-            "timestamp": datetime.utcnow(),
+            "timestamp": datetime.now(UTC),
             "user": user,
             "action": action,
             "file_id": file_id,
@@ -138,14 +138,14 @@ class SecurityLogModel:
     """Security event log model"""
 
     @staticmethod
-    def create_log(event_type: str, threat_level: str, user: str = None,
-                   file_id: str = None, details: str = "") -> dict:
+    def create_log(event_type: str, threat_level: str, user: str|None = None,
+                   file_id: str|None = None, details: str = "") -> dict:
         """
         Create security log entry
         Returns: Security log document
         """
         return {
-            "timestamp": datetime. utcnow(),
+            "timestamp": datetime. now(UTC),
             "event_type": event_type,
             "threat_level": threat_level,
             "user": user,
