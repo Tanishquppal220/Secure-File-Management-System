@@ -131,3 +131,28 @@ class FileEncryption:
         """
         fernet = Fernet(key)
         return fernet.decrypt(encrypted_data)
+
+    @staticmethod
+    def wrap_key(data_key: bytes, master_key: bytes) -> bytes:
+        """
+        Encrypt a per-file data key using master key (Envelope Encryption)
+        Args:
+            data_key: Per-file encryption key
+            master_key: Master encryption key from secrets
+        Returns:
+            Wrapped key bytes
+        """
+        return Fernet(master_key).encrypt(data_key)
+
+    @staticmethod
+    def unwrap_key(wrapped_key: bytes, master_key: bytes) -> bytes:
+        """
+        Decrypt a wrapped per-file data key using master key
+        Args:
+            wrapped_key: Wrapped key bytes
+            master_key: Master encryption key from secrets
+        Returns:
+            Original per-file data key bytes
+        """
+        return Fernet(master_key).decrypt(wrapped_key)
+

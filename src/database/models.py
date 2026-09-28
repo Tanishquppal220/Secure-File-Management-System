@@ -50,6 +50,7 @@ class UserModel:
             "last_login": None,
             "is_active": True,
             "failed_login_attempts": 0,
+            "failed_2fa_attempts": 0,
             "account_locked_until": None,
         }
 
@@ -74,7 +75,7 @@ class FileModel:
 
     @staticmethod
     def create_file(file_id: str, filename: str, owner: str,
-                    encrypted_path: str, encryption_key: str,
+                    encrypted_path: str, wrapped_key: str,
                     file_size: int, mime_type: str) -> dict:
         """
         Create file document
@@ -85,7 +86,7 @@ class FileModel:
             "filename": filename,
             "owner": owner,
             "encrypted_path": encrypted_path,
-            "encryption_key": encryption_key,
+            "wrapped_key": wrapped_key,
             "file_size": file_size,
             "mime_type": mime_type,
             "uploaded_at": datetime.now(UTC),

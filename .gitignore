@@ -8,4 +8,7 @@ logs/*.log
 .streamlit/secrets.toml
 docs/
 GEMINI.md
+.pytest_cache/
+.coverage
+htmlcov/
 

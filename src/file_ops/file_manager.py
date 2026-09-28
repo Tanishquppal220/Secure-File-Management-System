@@ -4,7 +4,7 @@ File management operations with encryption and security
 import os
 import uuid
 import shutil
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from typing import Optional, Tuple, Dict, List, BinaryIO
 from pathlib import Path
 from src.database.connection import db_connection
@@ -12,7 +12,7 @@ from src.database.models import FileModel, AccessLogModel, SecurityLogModel
 from src.utils. encryption import FileEncryption
 from src.utils.validators import Validators
 from src.utils.logger import logger
-from src.threat_detection.malware_scanner import MalwareScanner
+from src.threat_detection.malware_scanner import MalwareScanner, ScanStatus
 import mimetypes
 import streamlit as st
 
@@ -87,47 +87,50 @@ class FileManager:
             file_id = str(uuid.uuid4())
 
             # Save temporary file
-            temp_path = self. upload_dir / f"temp_{file_id}_{filename}"
+            temp_path = self.upload_dir / f"temp_{file_id}_{filename}"
             with open(temp_path, 'wb') as f:
                 f.write(file_obj.read())
 
             logger.info(
                 f"File uploaded temporarily: {filename} ({file_size} bytes)")
 
-            # Malware scan
+            # Malware scan (hash-first; zero quota, handles cached files of any size)
+            scan_result = None
             if scan_malware:
                 logger.info("Starting malware scan...")
-                is_safe, scan_result = self.malware_scanner. scan_file(
+                scan_status, scan_result = self.malware_scanner.scan_file(
                     str(temp_path), force_scan)
 
-                if not is_safe:
+                if scan_status != ScanStatus.SAFE:
                     # Log security event
                     self._log_security_event(
-                        "malware_detected",
-                        scan_result. get('threat_level', 'high'),
+                        "malware_detected" if scan_status == ScanStatus.THREAT else "scan_failed",
+                        scan_result.get('threat_level', 'high'),
                         owner,
                         file_id,
-                        f"Malware detected in file: {filename}"
+                        f"Threat scan rejected file {filename}: {scan_result.get('message')}"
                     )
 
                     # Delete temp file
-                    temp_path.unlink()
+                    temp_path.unlink(missing_ok=True)
 
-                    return False, f"⚠️ Security threat detected!  {scan_result. get('message')}", None
+                    return False, f"⚠️ Threat scan rejected file! {scan_result.get('message')}", None
 
-                logger. info(
+                logger.info(
                     f"Malware scan passed: {scan_result.get('message')}")
 
-            # Generate encryption key
+            # Generate per-file encryption key and wrap with master key (Envelope Encryption)
             encryption_key = FileEncryption.generate_key()
+            master_key = st.secrets['app']['MASTER_ENCRYPTION_KEY'].encode('utf-8')
+            wrapped_key = FileEncryption.wrap_key(encryption_key, master_key)
 
             # Encrypt file
-            encrypted_path = self. encrypted_dir / f"{file_id}. enc"
+            encrypted_path = self.encrypted_dir / f"{file_id}.enc"
             success = FileEncryption.encrypt_file(
                 str(temp_path), str(encrypted_path), encryption_key)
 
             if not success:
-                temp_path.unlink()
+                temp_path.unlink(missing_ok=True)
                 return False, "Failed to encrypt file", None
 
             logger.info(f"File encrypted: {encrypted_path}")
@@ -137,13 +140,13 @@ class FileManager:
             if mime_type is None:
                 mime_type = "application/octet-stream"
 
-            # Create file document
-            file_doc = FileModel. create_file(
+            # Create file document with wrapped_key
+            file_doc = FileModel.create_file(
                 file_id=file_id,
                 filename=filename,
                 owner=owner,
                 encrypted_path=str(encrypted_path),
-                encryption_key=encryption_key. decode('utf-8'),
+                wrapped_key=wrapped_key.decode('utf-8'),
                 file_size=file_size,
                 mime_type=mime_type
             )
@@ -152,16 +155,24 @@ class FileManager:
             if tags:
                 file_doc['tags'] = tags
 
-            # Add scan result
-            if scan_malware:
-                file_doc['threat_scan_status'] = 'clean'
+            # Add scan result (derive status dynamically, never hardcode 'clean')
+            if scan_malware and scan_result:
+                file_doc['threat_scan_status'] = scan_status.value
                 file_doc['threat_scan_result'] = scan_result
 
-            # Save to database
-            self.files_collection.insert_one(file_doc)
+            # Save to database with disk rollback if insert fails
+            try:
+                self.files_collection.insert_one(file_doc)
+            except Exception as db_err:
+                logger.error(f"Database insertion failed, rolling back ciphertext on disk: {db_err}")
+                if encrypted_path.exists():
+                    encrypted_path.unlink(missing_ok=True)
+                if temp_path.exists():
+                    temp_path.unlink(missing_ok=True)
+                raise
 
             # Delete temp file
-            temp_path. unlink()
+            temp_path.unlink(missing_ok=True)
 
             # Log access
             self._log_access(owner, "upload", file_id,
@@ -188,7 +199,7 @@ class FileManager:
         """
         try:
             # Get file metadata
-            file_doc = self. files_collection.find_one({"file_id": file_id})
+            file_doc = self.files_collection.find_one({"file_id": file_id})
 
             if not file_doc:
                 return False, "File not found", None, None
@@ -201,8 +212,18 @@ class FileManager:
             if not self._check_permission(file_doc, username, 'read'):
                 return False, "You don't have permission to download this file", None, None
 
-            # Get encryption key
-            encryption_key = file_doc['encryption_key']. encode('utf-8')
+            # Recover encryption key (supporting envelope encryption and legacy records)
+            if 'wrapped_key' in file_doc and file_doc['wrapped_key']:
+                master_key = st.secrets['app']['MASTER_ENCRYPTION_KEY'].encode('utf-8')
+                encryption_key = FileEncryption.unwrap_key(
+                    file_doc['wrapped_key'].encode('utf-8'), master_key
+                )
+            elif 'encryption_key' in file_doc and file_doc['encryption_key']:
+                # Legacy fallback
+                encryption_key = file_doc['encryption_key'].encode('utf-8')
+            else:
+                return False, "Encryption key not found for file", None, None
+
             encrypted_path = file_doc['encrypted_path']
 
             # Check if encrypted file exists
@@ -210,7 +231,7 @@ class FileManager:
                 return False, "Encrypted file not found on server", None, None
 
             # Decrypt file to temporary location
-            temp_decrypted = self. upload_dir / f"temp_dec_{file_id}"
+            temp_decrypted = self.upload_dir / f"temp_dec_{file_id}"
             success = FileEncryption.decrypt_file(
                 encrypted_path, str(temp_decrypted), encryption_key)
 
@@ -228,7 +249,7 @@ class FileManager:
             self. files_collection.update_one(
                 {"file_id": file_id},
                 {
-                    "$set": {"last_accessed": datetime.utcnow()},
+                    "$set": {"last_accessed": datetime.now(timezone.utc)},
                     "$inc": {"access_count": 1}
                 }
             )
@@ -509,6 +530,84 @@ class FileManager:
         except Exception as e:
             logger.error(f"Delete file error: {e}")
             return False, f"Delete failed: {str(e)}"
+
+    def purge_file(self, file_id: str, username: str) -> Tuple[bool, str]:
+        """
+        Permanently delete a file (hard delete ciphertext from disk and document from DB)
+
+        Args:
+            file_id: File ID
+            username: Username requesting purge
+
+        Returns:
+            (success: bool, message: str)
+        """
+        try:
+            file_doc = self.files_collection.find_one({"file_id": file_id})
+
+            if not file_doc:
+                return False, "File not found"
+
+            # Only owner can permanently purge files
+            if file_doc['owner'] != username:
+                return False, "Only the file owner can permanently purge files"
+
+            # Remove physical encrypted file from disk
+            encrypted_path = Path(file_doc['encrypted_path'])
+            if encrypted_path.exists():
+                encrypted_path.unlink(missing_ok=True)
+
+            # Remove from database
+            self.files_collection.delete_one({"file_id": file_id})
+
+            # Log security event
+            self._log_security_event(
+                "file_purged",
+                "none",
+                username,
+                file_id,
+                f"Permanently purged file: {file_doc['filename']}"
+            )
+
+            logger.info(f"File permanently purged: {file_id} by {username}")
+            return True, "File permanently purged"
+
+        except Exception as e:
+            logger.error(f"Purge file error: {e}")
+            return False, f"Purge failed: {str(e)}"
+
+    def purge_deleted_files(self, username: str, days_threshold: int = 30) -> Tuple[int, str]:
+        """
+        Permanently purge all soft-deleted files older than threshold
+
+        Args:
+            username: Username
+            days_threshold: Age threshold in days
+
+        Returns:
+            (count_purged: int, message: str)
+        """
+        try:
+            cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_threshold)
+            query = {
+                "owner": username,
+                "is_deleted": True,
+                "last_modified": {"$lte": cutoff_date}
+            }
+            deleted_files = list(self.files_collection.find(query))
+            purged_count = 0
+
+            for file_doc in deleted_files:
+                success, _ = self.purge_file(file_doc["file_id"], username)
+                if success:
+                    purged_count += 1
+
+            return purged_count, f"Purged {purged_count} files"
+
+        except Exception as e:
+            logger.error(f"Purge deleted files error: {e}")
+            return 0, f"Purge failed: {str(e)}"
+
 
     def _check_permission(self, file_doc: Dict, username: str, permission: str) -> bool:
         """Check if user has permission for a file"""

@@ -127,7 +127,7 @@ def upload_page():
         - Allowed file types: {', '.join(file_manager.allowed_extensions)}
         
         **Security Features:**
-        - All files are encrypted using AES-256
+        - All files are encrypted at rest using Fernet (per-file key)
         - Optional malware scanning with VirusTotal
         - Secure storage with access control
         - Activity logging for audit trail

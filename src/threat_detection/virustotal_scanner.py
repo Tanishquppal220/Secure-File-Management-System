@@ -1,6 +1,7 @@
 """
 VirusTotal malware scanner integration
 """
+from enum import Enum
 import requests
 import time
 import hashlib
@@ -11,6 +12,16 @@ import streamlit as st
 from src.utils.logger import logger
 
 
+class ScanStatus(Enum):
+    """Tri-state malware scan status enforcing fail-closed security at the type level"""
+    SAFE = "safe"
+    THREAT = "threat"
+    UNKNOWN = "unknown"
+
+
+class VirusTotalError(Exception):
+    """Exception raised for VirusTotal API communication and lookup errors."""
+    pass
 
 
 class VirusTotalScanner:
@@ -27,7 +38,7 @@ class VirusTotalScanner:
             logger.warning(
                 "VirusTotal API key not found. Malware scanning disabled.")
 
-    def scan_file(self, file_path: str, force_scan: bool = False) -> Tuple[bool, Dict]:
+    def scan_file(self, file_path: str, force_scan: bool = False) -> Tuple[ScanStatus, Dict]:
         """
         Scan a file for malware using VirusTotal
         
@@ -36,22 +47,22 @@ class VirusTotalScanner:
             force_scan: Whether to force a fresh scan (ignore cache)
             
         Returns:
-            (is_safe: bool, result: Dict)
+            (status: ScanStatus, result: Dict)
         """
         if not self.api_key:
-            return True, {
-                "status": "skipped",
+            return ScanStatus.UNKNOWN, {
+                "status": "unavailable",
                 "message": "VirusTotal API key not configured",
                 "threat_level": "unknown",
-                "is_safe": True
+                "is_safe": False
             }
 
         try:
-            # Step 1: Calculate file hash
+            # Step 1: Calculate file hash (zero quota, works for any file size)
             file_hash = self._calculate_file_hash(file_path)
             logger.info(f"Scanning file with hash: {file_hash}")
 
-            # Step 2: Check if file was already scanned
+            # Step 2: Check if file was already scanned (cache lookup first)
             if not force_scan:
                 existing_result = self._get_file_report(file_hash)
 
@@ -59,19 +70,29 @@ class VirusTotalScanner:
                     logger.info("File already scanned, using cached results")
                     return self._parse_scan_result(existing_result)
 
-            # Step 3: Upload and scan file
+            # Step 3: Check file size limit ONLY before uploading to VirusTotal (free-tier limit: 32MB)
+            file_size = Path(file_path).stat().st_size
+            if file_size > 32 * 1024 * 1024:
+                return ScanStatus.UNKNOWN, {
+                    "status": "unsupported",
+                    "message": "File exceeds VirusTotal 32MB upload limit and has no existing cached report",
+                    "threat_level": "unknown",
+                    "is_safe": False
+                }
+
+            # Step 4: Upload and scan file
             logger.info("Uploading file for scanning...")
             scan_result = self._upload_file(file_path)
 
             if not scan_result:
-                return False, {
+                return ScanStatus.UNKNOWN, {
                     "status": "error",
                     "message": "Failed to upload file",
                     "threat_level": "unknown",
                     "is_safe": False
                 }
 
-            # Step 4: Get analysis results
+            # Step 5: Get analysis results
             analysis_id = scan_result.get('data', {}).get('id')
 
             if analysis_id:
@@ -81,25 +102,25 @@ class VirusTotalScanner:
                 analysis_result = self._get_analysis_result(analysis_id)
                 
                 if analysis_result is None:
-                    return False, {
+                    return ScanStatus.UNKNOWN, {
                         "status": "timeout",
-                        "message": "Scan timed out or failed. Please try again later.",
+                        "message": "Scan timed out or rate limit reached. Please try again later.",
                         "threat_level": "unknown",
                         "is_safe": False
                     }
                     
                 return self._parse_scan_result(analysis_result)
 
-            return True, {
+            return ScanStatus.UNKNOWN, {
                 "status": "pending",
-                "message": "Scan initiated, results pending",
+                "message": "Scan did not return an analysis ID; upload not accepted",
                 "threat_level": "unknown",
-                "is_safe": True
+                "is_safe": False
             }
 
         except Exception as e:
-            logger. error(f"VirusTotal scan error: {e}")
-            return False, {
+            logger.error(f"VirusTotal scan error: {e}")
+            return ScanStatus.UNKNOWN, {
                 "status": "error",
                 "message": str(e),
                 "threat_level": "unknown",
@@ -118,18 +139,23 @@ class VirusTotalScanner:
 
     def _get_file_report(self, file_hash: str) -> Optional[Dict]:
         """Get existing file report by hash"""
+        url = f"{self.base_url}/files/{file_hash}"
         try:
-            url = f"{self.base_url}/files/{file_hash}"
             response = requests.get(url, headers=self.headers, timeout=10)
 
             if response.status_code == 200:
                 return response.json()
+            if response.status_code == 404:
+                return None  # Genuinely not cached
+            if response.status_code == 429:
+                logger.warning("VirusTotal API quota exceeded (429)")
+                raise VirusTotalError(f"Rate limited by VirusTotal: {response.status_code}")
 
-            return None
+            raise VirusTotalError(f"Hash lookup failed: {response.status_code} - {response.text}")
 
-        except Exception as e:
-            logger. error(f"Error getting file report: {e}")
-            return None
+        except requests.RequestException as e:
+            logger.error(f"Network error getting file report: {e}")
+            raise VirusTotalError(f"Network error during hash lookup: {e}") from e
 
     def _upload_file(self, file_path: str) -> Optional[Dict]:
         """Upload file to VirusTotal for scanning"""
@@ -156,8 +182,8 @@ class VirusTotalScanner:
             logger.error(f"Error uploading file: {e}")
             return None
 
-    def _get_analysis_result(self, analysis_id: str, max_attempts: int = 20) -> Optional[Dict]:
-        """Get analysis result by ID (with retry)"""
+    def _get_analysis_result(self, analysis_id: str, max_attempts: int = 4) -> Optional[Dict]:
+        """Get analysis result by ID (with 15s poll cadence to respect 4 req/min free-tier limit)"""
         try:
             url = f"{self.base_url}/analyses/{analysis_id}"
 
@@ -174,7 +200,10 @@ class VirusTotalScanner:
 
                     logger.info(
                         f"Scan in progress... (attempt {attempt + 1}/{max_attempts})")
-                    time.sleep(3)
+                    time.sleep(15)  # 4 requests per minute free-tier cadence
+                elif response.status_code == 429:
+                    logger.warning("VirusTotal 429 rate limit received during analysis polling.")
+                    break
                 else:
                     logger.error(
                         f"Error getting analysis: {response.status_code}")
@@ -186,7 +215,7 @@ class VirusTotalScanner:
             logger.error(f"Error getting analysis result: {e}")
             return None
 
-    def _parse_scan_result(self, result: Dict) -> Tuple[bool, Dict]:
+    def _parse_scan_result(self, result: Dict) -> Tuple[ScanStatus, Dict]:
         """Parse VirusTotal scan result"""
         try:
             attributes = result.get('data', {}).get('attributes', {})
@@ -195,27 +224,27 @@ class VirusTotalScanner:
 
             # Get detection counts
             malicious = stats.get('malicious', 0)
-            suspicious = stats. get('suspicious', 0)
+            suspicious = stats.get('suspicious', 0)
             undetected = stats.get('undetected', 0)
             harmless = stats.get('harmless', 0)
 
             total_scans = malicious + suspicious + undetected + harmless
 
-            # Determine threat level
+            # Determine threat level and ScanStatus
             if malicious > 0:
                 threat_level = "high" if malicious > 3 else "medium"
-                is_safe = False
+                scan_status = ScanStatus.THREAT
             elif suspicious > 0:
                 threat_level = "low"
-                is_safe = False
+                scan_status = ScanStatus.THREAT
             else:
                 threat_level = "none"
-                is_safe = True
+                scan_status = ScanStatus.SAFE
 
             # Build result
             scan_info = {
-                "status": "completed",
-                "is_safe": is_safe,
+                "status": scan_status.value,
+                "is_safe": (scan_status == ScanStatus.SAFE),
                 "threat_level": threat_level,
                 "malicious": malicious,
                 "suspicious": suspicious,
@@ -228,11 +257,11 @@ class VirusTotalScanner:
 
             logger.info(f"Scan result: {scan_info['message']}")
 
-            return is_safe, scan_info
+            return scan_status, scan_info
 
         except Exception as e:
             logger.error(f"Error parsing scan result: {e}")
-            return False, {
+            return ScanStatus.UNKNOWN, {
                 "status": "error",
                 "message": "Failed to parse scan results",
                 "threat_level": "unknown",

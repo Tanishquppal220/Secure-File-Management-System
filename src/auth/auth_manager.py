@@ -1,16 +1,16 @@
 """
 Main authentication manager
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+import time
 from typing import Optional, Dict, Tuple
 from src.database.connection import db_connection
 from src.database.models import UserModel, AccessLogModel
 from src.auth.password_manager import PasswordManager
-from src. auth.two_factor import TwoFactorAuth
+from src.auth.two_factor import TwoFactorAuth
 from src.utils.validators import Validators
 from src.utils.logger import logger
-from io import BytesIO  
-from typing import Optional
+from io import BytesIO
 
 class AuthManager:
     """Manage user authentication and authorization"""
@@ -94,15 +94,19 @@ class AuthManager:
 
             # Check if account is locked
             if user.get('account_locked_until'):
-                if datetime.now(datetime.timezone.utc) < user['account_locked_until']:
-                    return False, "Account is temporarily locked.  Please try again later.", None
+                locked_until = user['account_locked_until']
+                if locked_until.tzinfo is None:
+                    locked_until = locked_until.replace(tzinfo=timezone.utc)
+                if datetime.now(timezone.utc) < locked_until:
+                    return False, "Account is temporarily locked. Please try again later.", None
                 else:
                     # Unlock account
                     self.users_collection.update_one(
                         {"username": username},
                         {"$set": {
                             "account_locked_until": None,
-                            "failed_login_attempts": 0
+                            "failed_login_attempts": 0,
+                            "failed_2fa_attempts": 0
                         }}
                     )
 
@@ -114,7 +118,7 @@ class AuthManager:
 
                 # Lock account if max attempts exceeded
                 if failed_attempts >= self.max_failed_attempts:
-                    lockout_until = datetime.now(datetime.timezone.utc) + timedelta(minutes=self. lockout_duration_minutes)
+                    lockout_until = datetime.now(timezone.utc) + timedelta(minutes=self.lockout_duration_minutes)
                     update_data['account_locked_until'] = lockout_until
 
                     self.users_collection.update_one(
@@ -126,7 +130,7 @@ class AuthManager:
                                      details="Account locked due to multiple failed attempts")
                     return False, f"Too many failed attempts. Account locked for {self.lockout_duration_minutes} minutes.", None
 
-                self. users_collection.update_one(
+                self.users_collection.update_one(
                     {"username": username},
                     {"$set": update_data}
                 )
@@ -147,7 +151,7 @@ class AuthManager:
                 {"$set": {
                     "failed_login_attempts": 0,
                     "account_locked_until": None,
-                    "last_login": datetime.utcnow()
+                    "last_login": datetime.now(timezone.utc)
                 }}
             )
 
@@ -183,13 +187,64 @@ class AuthManager:
             if not user.get('two_fa_enabled', False):
                 return False, "2FA is not enabled for this account", None
 
+            # Check if account is locked
+            if user.get('account_locked_until'):
+                locked_until = user['account_locked_until']
+                if locked_until.tzinfo is None:
+                    locked_until = locked_until.replace(tzinfo=timezone.utc)
+                if datetime.now(timezone.utc) < locked_until:
+                    return False, "Account is temporarily locked. Please try again later.", None
+                else:
+                    # Lockout period expired; clear lockout
+                    self.users_collection.update_one(
+                        {"username": username},
+                        {"$set": {
+                            "account_locked_until": None,
+                            "failed_2fa_attempts": 0,
+                            "failed_login_attempts": 0
+                        }}
+                    )
+
             # Verify TOTP token
             if not self.two_fa.verify_totp(user['two_fa_secret'], token):
+                time.sleep(0.5)  # Constant delay to reduce timing attack viability
+                failed_attempts = user.get('failed_2fa_attempts', 0) + 1
+                update_data = {"failed_2fa_attempts": failed_attempts}
+
+                # Lock account if max 2FA attempts exceeded
+                if failed_attempts >= self.max_failed_attempts:
+                    lockout_until = datetime.now(timezone.utc) + timedelta(minutes=self.lockout_duration_minutes)
+                    update_data['account_locked_until'] = lockout_until
+
+                    self.users_collection.update_one(
+                        {"username": username},
+                        {"$set": update_data}
+                    )
+
+                    self._log_access(username, "2fa_verification", status="blocked",
+                                     details="Account locked due to multiple failed 2FA attempts")
+                    return False, f"Too many invalid codes. Account locked for {self.lockout_duration_minutes} minutes.", None
+
+                self.users_collection.update_one(
+                    {"username": username},
+                    {"$set": update_data}
+                )
+
                 self._log_access(username, "2fa_verification", status="failed",
                                  details="Invalid 2FA token")
                 return False, "Invalid 2FA code", None
 
-            # 2FA verification successful
+            # 2FA verification successful - reset failed attempts and clear lockout
+            self.users_collection.update_one(
+                {"username": username},
+                {"$set": {
+                    "failed_2fa_attempts": 0,
+                    "failed_login_attempts": 0,
+                    "account_locked_until": None,
+                    "last_login": datetime.now(timezone.utc)
+                }}
+            )
+
             self._log_access(username, "2fa_verification", status="success")
             logger.info(f"2FA verified for user: {username}")
 

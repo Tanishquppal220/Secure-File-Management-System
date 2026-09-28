@@ -77,15 +77,21 @@ class Validators:
         if not filename:
             return False, "Filename cannot be empty"
 
-        # Check for path traversal attempts
-        if '. .' in filename or '/' in filename or '\\' in filename:
+        # Check for path traversal attempts, null bytes, absolute paths, and hidden files
+        if (
+            '..' in filename
+            or '/' in filename
+            or '\\' in filename
+            or '\0' in filename
+            or filename.startswith('.')
+        ):
             return False, "Invalid filename: path traversal detected"
 
         # Check extension if allowed_extensions provided
         if allowed_extensions:
             ext = filename.split('.')[-1].lower() if '.' in filename else ''
             if ext not in allowed_extensions:
-                return False, f"File type . {ext} not allowed.  Allowed types: {', '.join(allowed_extensions)}"
+                return False, f"File type .{ext} not allowed. Allowed types: {', '.join(allowed_extensions)}"
 
         return True, "Valid filename"
 
